@@ -3,7 +3,7 @@ use std::sync::Arc;
 use potion::HtmlError;
 use sqlx::{Pool, Postgres, QueryBuilder};
 
-use crate::{authentication::{cryptography::verify_password, jwt::{generate_jwt_session, JwtSessionData}}, constants::PRODUCT_COUNT_PER_PAGE};
+use crate::{authentication::{cryptography::verify_password, jwt::{generate_jwt_session, JwtSessionData}}, constants::PRODUCT_COUNT_PER_PAGE, schema::{IncredientCacheData, RecipeCacheData}};
 
 use super::{error::QueryError, schema::{Category, Incredient, IncredientFilterObject, Product, ProductType, Recipe, RecipePart, RecipeType, SubCategory, UnitType, User}};
 
@@ -144,6 +144,8 @@ pub async fn add_to_recipe(recipe_id: i32, base: i32, unit: UnitType, amount: i3
         .bind(amount_ml)
         .bind(unit)
         .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    update_recipe_cached_data(recipe_id, pool).await?;
     
     Ok(())
 }
@@ -155,10 +157,108 @@ pub async fn remove_from_recipe(recipe_id: i32, incredient_id: i32, pool: Arc<Po
         .bind(recipe_id)
         .bind(incredient_id)
         .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    update_recipe_cached_data(recipe_id, pool).await?;
     
     Ok(())
 }
 
+pub async fn calculate_recipe_cached_data(recipe_id: i32, pool: Arc<Pool<Postgres>>) -> Result<RecipeCacheData, potion::Error> {
+    let data: Option<RecipeCacheData> = sqlx::query_as("
+        SELECT COUNT(e1) AS incredient_count,
+            bool_and(e1.apc) AS available_alko,
+            bool_and(e1.sapc) AS available_superalko,
+
+            SUM(e1.volume) AS total_volume,
+
+            ((SUM(e1.ethanol_min) + SUM(e1.ethanol_max)) / 2) / 17.7 AS standard_servings,
+            ((SUM(e1.alko_price_average) + SUM(e1.alko_price_min) + SUM(e1.superalko_price_average) + SUM(e1.alko_price_average) ) / 4) / (((SUM(e1.ethanol_min) + SUM(e1.ethanol_max)) / 2) / 17.7) AS price_per_serving,
+
+            SUM(e1.alko_price_min) AS alko_price_min,
+            SUM(e1.alko_price_max) AS alko_price_max,
+            (SUM(e1.alko_price_average) + SUM(e1.alko_price_min)) / 2 AS alko_price_average,
+
+            SUM(e1.superalko_price_min) AS superalko_price_min,
+            SUM(e1.superalko_price_max) AS superalko_price_max,
+            (SUM(e1.superalko_price_average) + SUM(e1.superalko_price_min)) / 2 AS superalko_price_average,
+
+            (SUM(e1.ethanol_min) / SUM(e1.volume)) * 100 AS abv_min,
+            ( ( (SUM(e1.ethanol_min) / SUM(e1.volume) ) + ( SUM(e1.ethanol_max) / SUM(e1.volume) ) ) / 2) * 100 AS abv_average,
+            (SUM(e1.ethanol_max) / SUM(e1.volume)) * 100 AS abv_max
+        FROM (
+            SELECT rp.recipe_id AS id,
+                rp.amount_standard AS volume,
+
+                (d.abv_min / 100) * rp.amount_standard AS ethanol_min,
+                (d.abv_max / 100) * rp.amount_standard AS ethanol_max,
+
+                (d.alko_price_min / 1000) * rp.amount_standard as alko_price_min,
+                (d.alko_price_average / 1000) * rp.amount_standard as alko_price_average,
+                (d.alko_price_max / 1000) * rp.amount_standard as alko_price_max,
+
+                (d.superalko_price_min / 1000) * rp.amount_standard as superalko_price_min,
+                (d.superalko_price_average / 1000) * rp.amount_standard as superalko_price_average,
+                (d.superalko_price_max / 1000) * rp.amount_standard as superalko_price_max,
+
+                d.alko_product_count > 0 AS apc,
+                d.superalko_product_count > 0 AS sapc
+            FROM recipe_parts rp
+            INNER JOIN drink_incredients d ON d.id = rp.incredient_id
+            WHERE rp.recipe_id = $1
+            GROUP BY (rp.recipe_id, rp.amount_standard, d.alko_product_count, d.superalko_product_count, d.abv_min, d.alko_price_min, d.superalko_price_min, d.abv_max, d.alko_price_max, d.superalko_price_max, d.alko_price_average, d.superalko_price_average)
+        ) e1;
+    ")
+    .bind(recipe_id)
+    .fetch_optional(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    match data {
+        Some(data) => Ok(data),
+        None => Ok(RecipeCacheData::default()),
+    }
+}
+
+pub async fn update_recipe_cached_data(recipe_id: i32, pool: Arc<Pool<Postgres>>) -> Result<(), potion::Error> {
+    let data = calculate_recipe_cached_data(recipe_id, pool.clone()).await?;
+    
+    sqlx::query("
+        UPDATE drink_recipes SET
+        abv_min = $1, 
+        abv_max = $2, 
+        abv_average = $3, 
+        alko_price_min = $4, 
+        alko_price_max = $5, 
+        alko_price_average = $6,
+        superalko_price_min = $7, 
+        superalko_price_max = $8, 
+        superalko_price_average = $9,
+        incredient_count = $10,
+        total_volume = $11,
+        standard_servings = $12,
+        price_per_serving = $13,
+        available_alko = $14,
+        available_superalko = $15
+        WHERE recipe_id = $16
+    ")
+    .bind(data.abv_min)
+    .bind(data.abv_max)
+    .bind(data.abv_average)
+    .bind(data.alko_price_min)
+    .bind(data.alko_price_max)
+    .bind(data.alko_price_average)
+    .bind(data.superalko_price_min)
+    .bind(data.superalko_price_max)
+    .bind(data.superalko_price_average)
+    .bind(data.incredient_count)
+    .bind(data.total_volume)
+    .bind(data.standard_servings)
+    .bind(data.price_per_serving)
+    .bind(data.available_alko)
+    .bind(data.available_superalko)
+    .bind(recipe_id)
+    .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
 
 pub async fn list_incredients(pool: Arc<Pool<Postgres>>) -> Result<Vec<Incredient>, potion::Error> {
     let rows: Vec<Incredient> = sqlx::query_as("SELECT * FROM drink_incredients;")
@@ -200,7 +300,7 @@ pub async fn create_incredient(category: Option<ProductType>, name: String, user
     Ok(())
 }
 
-pub async fn get_incredient(pool: Arc<Pool<Postgres>>, id: i32) -> Result<Option<Incredient>, potion::Error> {
+pub async fn get_incredient(id: i32, pool: Arc<Pool<Postgres>>) -> Result<Option<Incredient>, potion::Error> {
     let row: Option<Incredient> = sqlx::query_as("SELECT * FROM drink_incredients WHERE id = $1")
     .bind(id)
     .fetch_optional(&*pool).await.map_err(|e| QueryError::from(e).into())?;
@@ -208,8 +308,8 @@ pub async fn get_incredient(pool: Arc<Pool<Postgres>>, id: i32) -> Result<Option
     Ok(row)
 }
 
-pub async fn fetch_incredient(session: JwtSessionData, pool: Arc<Pool<Postgres>>, id: i32) -> Result<Incredient, potion::Error> {
-    let incredient = get_incredient(pool.clone(), id).await?;
+pub async fn get_incredient_mut(id: i32, session: JwtSessionData, pool: Arc<Pool<Postgres>>) -> Result<Incredient, potion::Error> {
+    let incredient = get_incredient(id, pool.clone()).await?;
 
     match incredient {
         Some(incredient) => {
@@ -260,7 +360,7 @@ pub async fn update_incredient_price(id: i32, min: f64, max: f64, pool: Arc<Pool
         superalko_price_average = $2,
         superalko_price_max = $3,
         alko_product_count = 1,
-        alko_product_count = 1
+        superalko_product_count = 1
         WHERE id = $4
     ")
         .bind(min)
@@ -272,7 +372,7 @@ pub async fn update_incredient_price(id: i32, min: f64, max: f64, pool: Arc<Pool
     Ok(())
 }
 
-pub async fn update_incredient_product_category(id: i32, category: Option<i32>, pool: Arc<Pool<Postgres>>) -> Result<(), potion::Error> {
+pub async fn update_incredient_product_category(id: i32, category: i32, pool: Arc<Pool<Postgres>>) -> Result<(), potion::Error> {
     sqlx::query("UPDATE drink_incredients SET category = $1 WHERE id = $2")
         .bind(category)
         .bind(id)
@@ -294,12 +394,7 @@ pub async fn insert_product_filter(id: i32, id_map: Vec<i32>, pool: Arc<Pool<Pos
     
         query_builder.build().execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
         
-        /*
-        match update_cached_data(pool, id).await {
-            Ok(_) => {},
-            Err(e) => panic!("{e}"),
-        }
-        */
+        calculate_incredient_cached_data(id, pool).await?;
     }
     
     Ok(())
@@ -310,7 +405,81 @@ pub async fn remove_product_filter(id: i32, product_id: i32, pool: Arc<Pool<Post
         .bind(product_id)
         .bind(id)
         .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    calculate_incredient_cached_data(id, pool).await?;
     
+    Ok(())
+}
+
+pub async fn calculate_incredient_cached_data(incredient_id: i32, pool: Arc<Pool<Postgres>>) -> Result<IncredientCacheData, potion::Error> {
+    let data: Option<IncredientCacheData> = sqlx::query_as("
+        SELECT 
+            COALESCE(AVG(ap.unit_price), 0) AS alko_price_average,
+            COALESCE(MAX(ap.unit_price), 0) AS alko_price_max,
+            COALESCE(min(ap.unit_price), 0) AS alko_price_min,
+
+            COALESCE(AVG(sap.unit_price), 0) AS superalko_price_average,
+            COALESCE(MAX(sap.unit_price), 0) AS superalko_price_max,
+            COALESCE(MIN(sap.unit_price), 0) AS superalko_price_min,
+
+            AVG(p.abv) AS abv_average,
+            MAX(p.abv) AS abv_max,
+            MIN(p.abv) AS abv_min,
+
+            COUNT(ap) AS alko_product_count,
+            COUNT(sap) AS superalko_product_count
+        FROM incredient_product_filters f
+        LEFT JOIN products p ON p.id = product_id
+        LEFT JOIN products ap ON (ap.id = product_id AND ap.retailer = 'alko')
+        LEFT JOIN products sap ON (sap.id = product_id AND sap.retailer = 'superalko')
+        WHERE incredient_id = $1
+        GROUP BY f.incredient_id
+    ")
+    .bind(incredient_id)
+    .fetch_optional(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    match data {
+        Some(data) => Ok(data),
+        None => Ok(IncredientCacheData::default()),
+    }
+}
+
+pub async fn update_incredient_cached_data(incredient_id: i32, pool: Arc<Pool<Postgres>>) -> Result<(), potion::Error> {
+    let data = calculate_incredient_cached_data(incredient_id, pool.clone()).await?;
+    
+    sqlx::query("
+        UPDATE drink_incredients SET
+        abv_min = $1, 
+        abv_max = $2, 
+        abv_average = $3,
+
+        alko_price_min = $4, 
+        alko_price_max = $5, 
+        alko_price_average = $6,
+
+        superalko_price_min = $7, 
+        superalko_price_max = $8, 
+        superalko_price_average = $9,
+
+        alko_product_count = $10, 
+        superalko_product_count = $11
+
+        WHERE id = $12
+    ")
+    .bind(data.abv_min)
+    .bind(data.abv_max)
+    .bind(data.abv_average)
+    .bind(data.alko_price_min)
+    .bind(data.alko_price_max)
+    .bind(data.alko_price_average)
+    .bind(data.superalko_price_min)
+    .bind(data.superalko_price_max)
+    .bind(data.superalko_price_average)
+    .bind(data.alko_product_count)
+    .bind(data.superalko_product_count)
+    .bind(incredient_id)
+    .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+
     Ok(())
 }
 

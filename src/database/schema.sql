@@ -72,7 +72,7 @@ CREATE TABLE drink_recipes (
     incredient_count INTEGER NOT NULL DEFAULT 0,
     favorite_count INTEGER NOT NULL DEFAULT 0,
 
-    avilable_superlalko BOOLEAN NOT NULL DEFAULT false,
+    available_superlalko BOOLEAN NOT NULL DEFAULT false,
     available_alko BOOLEAN NOT NULL DEFAULT false,
 
     FOREIGN KEY (author_id) REFERENCES users (id),
