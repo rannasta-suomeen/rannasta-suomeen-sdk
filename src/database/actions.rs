@@ -172,7 +172,7 @@ pub async fn calculate_recipe_cached_data(recipe_id: i32, pool: Arc<Pool<Postgre
             SUM(e1.volume) AS total_volume,
 
             ((SUM(e1.ethanol_min) + SUM(e1.ethanol_max)) / 2) / 17.7 AS standard_servings,
-            ((SUM(e1.alko_price_average) + SUM(e1.alko_price_min) + SUM(e1.superalko_price_average) + SUM(e1.alko_price_average) ) / 4) / (((SUM(e1.ethanol_min) + SUM(e1.ethanol_max)) / 2) / 17.7) AS price_per_serving,
+            (( SUM(e1.alko_price_average) + SUM(e1.alko_price_min) + SUM(e1.superalko_price_average) + SUM(e1.alko_price_average) ) / 4) / COALESCE( NULLIF( ( ( ( SUM(e1.ethanol_min) + SUM(e1.ethanol_max) ) / 2) / 17.7), 0 ), 1) AS price_per_serving,
 
             SUM(e1.alko_price_min) AS alko_price_min,
             SUM(e1.alko_price_max) AS alko_price_max,
@@ -394,7 +394,7 @@ pub async fn insert_product_filter(id: i32, id_map: Vec<i32>, pool: Arc<Pool<Pos
     
         query_builder.build().execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
         
-        calculate_incredient_cached_data(id, pool).await?;
+        update_incredient_cached_data(id, pool).await?;
     }
     
     Ok(())
@@ -406,7 +406,7 @@ pub async fn remove_product_filter(id: i32, product_id: i32, pool: Arc<Pool<Post
         .bind(id)
         .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
 
-    calculate_incredient_cached_data(id, pool).await?;
+    update_incredient_cached_data(id, pool).await?;
     
     Ok(())
 }
