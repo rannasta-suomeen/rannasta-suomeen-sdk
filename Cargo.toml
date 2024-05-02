@@ -1,0 +1,21 @@
+[package]
+name = "rannasta_suomeen_sdk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[toolchain]
+channel = "nightly"
+
+[dependencies]
+potion = { path = "../potion-rs" }
+warp = "0.3.7"
+serde_json = "1.0.115"
+serde = "1.0.197"
+tokio = { version = "1.37.0", features = ["full"] }
+sqlx = { version = "0.7.4", features = [ "runtime-tokio", "postgres", "time" ]}
+argon2 = "0.5.3"
+jwt = "0.16.0"
+sha2 = "0.10.8"
+hmac = "0.12.1"
