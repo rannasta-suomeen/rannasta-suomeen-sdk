@@ -1,10 +1,11 @@
 use std::convert::Infallible;
 
-use warp::{reject::{self, Rejection}, Filter};
+use warp::{
+    reject::{self, Rejection},
+    Filter,
+};
 
 use super::jwt::{verify_jwt_session, JwtSessionData};
-
-
 
 #[derive(Debug)]
 struct Unauthorized;
@@ -31,7 +32,8 @@ pub fn with_session() -> impl Filter<Extract = (JwtSessionData,), Error = Reject
     })
 }
 
-pub fn with_possible_session() -> impl Filter<Extract = (Option<JwtSessionData>,), Error = Rejection> + Copy  {
+pub fn with_possible_session(
+) -> impl Filter<Extract = (Option<JwtSessionData>,), Error = Rejection> + Copy {
     warp::cookie::<String>("session").map(move |session: String| {
         if let Ok(data) = verify_jwt_session(session) {
             Some(data)
@@ -40,4 +42,3 @@ pub fn with_possible_session() -> impl Filter<Extract = (Option<JwtSessionData>,
         }
     })
 }
-

@@ -31,21 +31,18 @@ impl TryFrom<Value> for ProductType {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.as_str() {
-            Some(value) => {
-                match value {
-                    "light_alcohol_product" => Ok(Self::LightAlcoholProduct),
-                    "strong_alcohol_product" => Ok(Self::StrongAlcoholProduct),
-                    "common" => Ok(Self::Common),
-                    "mixer" => Ok(Self::Mixer),
-                    "grocery" => Ok(Self::Grocery),
-                    _ => Err(TypeError::new("Invalid variant"))
-                }
+            Some(value) => match value {
+                "light_alcohol_product" => Ok(Self::LightAlcoholProduct),
+                "strong_alcohol_product" => Ok(Self::StrongAlcoholProduct),
+                "common" => Ok(Self::Common),
+                "mixer" => Ok(Self::Mixer),
+                "grocery" => Ok(Self::Grocery),
+                _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),
         }
     }
 }
-
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
@@ -53,7 +50,7 @@ impl TryFrom<Value> for ProductType {
 pub enum RecipeType {
     Cocktail,
     Shot,
-    Punch
+    Punch,
 }
 
 impl TryFrom<Value> for RecipeType {
@@ -61,13 +58,11 @@ impl TryFrom<Value> for RecipeType {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.as_str() {
-            Some(value) => {
-                match value {
-                    "cocktail" => Ok(Self::Cocktail),
-                    "shot" => Ok(Self::Shot),
-                    "punch" => Ok(Self::Punch),
-                    _ => Err(TypeError::new("Invalid variant"))
-                }
+            Some(value) => match value {
+                "cocktail" => Ok(Self::Cocktail),
+                "shot" => Ok(Self::Shot),
+                "punch" => Ok(Self::Punch),
+                _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),
         }
@@ -81,7 +76,7 @@ pub enum UnitType {
     Cl,
     Ml,
     Oz,
-    Kpl
+    Kpl,
 }
 
 impl TryFrom<Value> for UnitType {
@@ -89,14 +84,12 @@ impl TryFrom<Value> for UnitType {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.as_str() {
-            Some(value) => {
-                match value {
-                    "cl" => Ok(Self::Cl),
-                    "ml" => Ok(Self::Ml),
-                    "oz" => Ok(Self::Oz),
-                    "kpl" => Ok(Self::Kpl),
-                    _ => Err(TypeError::new("Invalid variant"))
-                }
+            Some(value) => match value {
+                "cl" => Ok(Self::Cl),
+                "ml" => Ok(Self::Ml),
+                "oz" => Ok(Self::Oz),
+                "kpl" => Ok(Self::Kpl),
+                _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),
         }
@@ -124,7 +117,7 @@ impl UnitType {
             (UnitType::Kpl, UnitType::Oz) => (other, 0.),
             (UnitType::Kpl, UnitType::Kpl) => (other, value),
         }
-    } 
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
@@ -132,7 +125,7 @@ impl UnitType {
 #[serde(rename_all = "snake_case")]
 pub enum Retailer {
     Superalko,
-    Alko
+    Alko,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -172,7 +165,7 @@ pub struct Incredient {
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
 pub struct Category {
     pub id: Uuid,
-    pub name: String
+    pub name: String,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -180,7 +173,7 @@ pub struct SubCategory {
     pub id: Uuid,
     pub name: String,
     pub category_id: Uuid,
-    pub product_count: i32
+    pub product_count: i32,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -200,7 +193,6 @@ pub struct Product {
     pub checksum: String,
     pub count: i64,
 }
-
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
 pub struct IncredientFilterObject {
@@ -261,7 +253,6 @@ pub struct Recipe {
     pub available_alko: bool,
 }
 
-
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
 pub struct RecipePart {
     pub recipe_id: Uuid,
@@ -290,7 +281,7 @@ pub struct RecipeCacheData {
     pub superalko_price_average: f64,
 
     pub incredient_count: i64,
-    
+
     pub available_superalko: bool,
     pub available_alko: bool,
 }

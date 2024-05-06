@@ -7,7 +7,6 @@ use sha2::Sha256;
 
 use crate::database::schema::User;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JwtSessionData {
     pub user_id: i32,
@@ -18,7 +17,7 @@ impl JwtSessionData {
     pub fn new(id: i32, username: String) -> Self {
         Self {
             user_id: id,
-            username
+            username,
         }
     }
 }
@@ -26,7 +25,7 @@ impl JwtSessionData {
 pub fn generate_jwt_session(user: &User) -> String {
     let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
     let claims = JwtSessionData::new(user.id, user.username.to_owned());
-    
+
     claims.sign_with_key(&key).unwrap()
 }
 

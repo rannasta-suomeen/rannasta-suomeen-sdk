@@ -1,4 +1,3 @@
-
 pub const PRODUCT_COUNT_PER_PAGE: i64 = 30;
 
 pub const INCREDIENT_CATEGORIES: &[(&str, &str)] = &[
@@ -15,9 +14,4 @@ pub const RECIPE_CATEGORIES: &[(&str, &str)] = &[
     ("punch", "Booli"),
 ];
 
-pub const UNITS: &[&str] = &[
-    "cl",
-    "ml",
-    "oz",
-    "kpl"
-];
+pub const UNITS: &[&str] = &["cl", "ml", "oz", "kpl"];
