@@ -1,7 +1,16 @@
-mod database { pub mod schema; pub mod actions; pub mod error; }
-mod authentication { pub mod cryptography; pub mod jwt; pub mod middleware; }
+mod database {
+    pub mod actions;
+    pub mod error;
+    pub mod schema;
+}
+mod authentication {
+    pub mod cryptography;
+    pub mod jwt;
+    pub mod middleware;
+    pub mod permissions;
+}
 mod constants;
 
-pub use database::*;
 pub use authentication::*;
 pub use constants::*;
+pub use database::*;
