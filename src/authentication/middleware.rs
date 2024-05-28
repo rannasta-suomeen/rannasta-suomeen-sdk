@@ -3,16 +3,16 @@ use std::convert::Infallible;
 use potion::HtmlError;
 use warp::Filter;
 
-use crate::{
-    authentication::jwt::{verify_jwt_session, SessionData},
-    jwt::Session,
-};
+
+pub type Session = Result<SessionData, potion::Error>;
+
+use crate::authentication::jwt::{verify_jwt_session, SessionData};
 
 pub fn with_session() -> impl Filter<Extract = (Session,), Error = Infallible> + Copy {
     warp::cookie::optional::<String>("session").then(|session: Option<String>| async move {
         if session.is_none() {
             return Err(potion::Error::from(
-                HtmlError::InvalidSession.redirect("Invalid session", "/users/login"),
+                HtmlError::InvalidSession.new("Invalid session"),
             ));
         }
 
@@ -20,7 +20,7 @@ pub fn with_session() -> impl Filter<Extract = (Session,), Error = Infallible> +
             return Ok::<SessionData, potion::Error>(data.into());
         } else {
             return Err(potion::Error::from(
-                HtmlError::InvalidSession.redirect("Missing session", "/users/login"),
+                HtmlError::InvalidSession.new("Missing session"),
             ));
         }
     })
@@ -38,5 +38,6 @@ pub fn with_possible_session(
         } else {
             None
         }
+
     })
 }

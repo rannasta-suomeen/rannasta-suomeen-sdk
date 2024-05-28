@@ -1,3 +1,6 @@
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Local;
 use hmac::{Hmac, Mac};
 use jwt::SignWithKey;
 use jwt::VerifyWithKey;
@@ -16,19 +19,25 @@ pub struct JwtSessionData {
     pub user_id: i32,
     pub username: String,
     pub user_uid: UserRole,
+    iat: i64,
+    exp: i64,
 }
 
 impl JwtSessionData {
     pub fn new(id: i32, username: String, uid: UserRole) -> Self {
+        let now = Local::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(1)).timestamp();
+
         Self {
             user_id: id,
             username,
             user_uid: uid,
+            iat,
+            exp
         }
     }
 }
-
-pub type Session = Result<SessionData, potion::Error>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SessionData {
@@ -69,8 +78,15 @@ pub fn generate_jwt_session(user: &User) -> String {
     claims.sign_with_key(&key).unwrap()
 }
 
-pub fn verify_jwt_session(token: String) -> Result<JwtSessionData, jwt::Error> {
+pub fn verify_jwt_session(token: String) -> Result<JwtSessionData, potion::Error> {
     let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
 
-    token.verify_with_key(&key)
+    token.verify_with_key(&key).map_err(|_| HtmlError::InvalidSession.new("Invalid Session; Invalid token")).map(|session: JwtSessionData| {
+        let now = Local::now().timestamp();
+
+        if (session.exp - now).is_negative() {
+            return Err(HtmlError::InvalidSession.new("Invalid session; Token expired"));
+        }
+        return Ok(session)
+    })?
 }

@@ -1,6 +1,6 @@
 pub const PRODUCT_COUNT_PER_PAGE: i64 = 100;
-pub const INCREDIENT_COUNT_PER_PAGE: i64 = 5;
-pub const RECIPE_COUNT_PER_PAGE: i64 = 2;
+pub const INCREDIENT_COUNT_PER_PAGE: i64 = 10;
+pub const RECIPE_COUNT_PER_PAGE: i64 = 10;
 
 pub const INCREDIENT_CATEGORIES: &[(&str, &str)] = &[
     ("light_alcohol_product", "Mieto alkoholijuoma"),

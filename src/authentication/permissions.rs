@@ -10,8 +10,6 @@ const ACTION_TABLE: &[(UserRole, &[ActionType])] = &[
             ActionType::CreateRecipes,
             ActionType::ManageOwnRecipes,
             ActionType::ManageOwnIncredients,
-            ActionType::ManageAllRecipes,
-            ActionType::ManageAllIncredients,
         ],
     ),
     (
@@ -20,6 +18,8 @@ const ACTION_TABLE: &[(UserRole, &[ActionType])] = &[
             ActionType::ManageOwnFavorites,
             ActionType::CreateIncredients,
             ActionType::CreateRecipes,
+            ActionType::ManageOwnRecipes,
+            ActionType::ManageOwnIncredients,
             ActionType::ManageAllRecipes,
             ActionType::ManageAllIncredients,
         ],

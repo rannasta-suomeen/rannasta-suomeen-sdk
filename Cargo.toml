@@ -9,7 +9,7 @@ edition = "2021"
 channel = "nightly"
 
 [dependencies]
-potion = { path = "../potion-rs" }
+potion = { git = "https://github.com/TuuKeZu/potion-rs.git" }
 warp = "0.3.7"
 serde_json = "1.0.115"
 serde = "1.0.197"
@@ -19,3 +19,4 @@ argon2 = "0.5.3"
 jwt = "0.16.0"
 sha2 = "0.10.8"
 hmac = "0.12.1"
+chrono = "0.4.26"
