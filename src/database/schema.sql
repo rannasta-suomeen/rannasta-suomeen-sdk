@@ -201,12 +201,6 @@ CREATE TABLE user_favorites(
 );
 
 
-/* Debugging */
-INSERT INTO users (uid, username, password) VALUES ('admin', 'test', 'test');
-INSERT INTO recipes DEFAULT VALUES;
-INSERT INTO drink_incredients (type, author_id, name, recipe_id, alcohol_percentage) VALUES ('common', 1, 'vesi', NULL, 0.0);
-
-
 /* sync recipes */
 CREATE OR REPLACE FUNCTION recipe_update_notify() RETURNS trigger AS $$
 DECLARE
