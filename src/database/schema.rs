@@ -188,10 +188,12 @@ pub struct Product {
     pub subcategory_id: Uuid,
 
     pub abv: f64,
+    pub aer: f64,
     pub unit_price: f64,
 
     pub checksum: String,
     pub count: i64,
+    pub retailer: Retailer
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
