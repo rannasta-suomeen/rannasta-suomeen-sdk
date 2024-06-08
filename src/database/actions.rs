@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use potion::HtmlError;
 use sqlx::{Pool, Postgres, QueryBuilder};
 
@@ -7,7 +9,7 @@ use crate::{
         jwt::{generate_jwt_session, JwtSessionData},
     },
     constants::PRODUCT_COUNT_PER_PAGE,
-    schema::{IncredientCacheData, RecipeCacheData},
+    schema::{IncredientCacheData, IngredientsForDrink, RecipeCacheData, RecipePartNoId, Uuid},
 };
 
 use super::{
@@ -17,6 +19,7 @@ use super::{
         RecipeType, SubCategory, UnitType, User,
     },
 };
+
 
 pub async fn get_user(
     pool: &Pool<Postgres>,
@@ -99,6 +102,25 @@ pub async fn list_recipe_parts(
     .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)
+}
+
+pub async fn list_all_recipe_parts(
+    pool: &Pool<Postgres>,
+    ) -> Result<Vec<IngredientsForDrink>, potion::Error>{
+    let filters: Vec<RecipePart> = sqlx::query_as("SELECT r.recipe_id AS recipe_id, r.incredient_id AS incredient_id, r.amount AS amount, r.unit AS unit, d.name AS name
+                                                  FROM recipe_parts r
+                                                  INNER JOIN drink_incredients d ON d.id = r.incredient_id")
+        .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
+    let mut hashmap: HashMap<Uuid,Vec<RecipePartNoId>> = HashMap::new();
+    filters.into_iter().for_each(|x| {
+        match hashmap.get_mut(&x.recipe_id) {
+            Some(v) => v.push(x.into()),
+            None => {
+                hashmap.insert(x.recipe_id, vec![x.into()]);
+            },
+        }
+    });
+    Ok(hashmap.into_iter().map(|(recipe_id, recipe_parts)| IngredientsForDrink{ recipe_id, recipe_parts }).collect())
 }
 
 pub async fn create_recipe(
