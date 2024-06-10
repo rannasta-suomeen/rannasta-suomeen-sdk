@@ -1,4 +1,3 @@
-use chrono::DateTime;
 use chrono::Duration;
 use chrono::Local;
 use hmac::{Hmac, Mac};

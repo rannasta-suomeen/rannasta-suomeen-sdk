@@ -22,7 +22,7 @@ Initialize postgresql service
 ```bash
 # pull or build `db`
 mkdir ./pg-data # NOTE: this directory will be owned by 'postgres' aftre initialization
-docker run -p 5432:5432 -e POSTGRES_PASSWORD="very_secret_password" -e POSTGRES_DB=rannasta_suomeen --mount type=bind,source=/var/lib/postgresql/data,target=/var/lib/postgresql/data db
+docker run -p 5432:5432 -e POSTGRES_PASSWORD="very_secret_password" -e POSTGRES_DB=rannasta_suomeen --mount type=bind,source=./pg-data,target=/var/lib/postgresql/data db
 ```
 Access the postgres service
 ```bash
