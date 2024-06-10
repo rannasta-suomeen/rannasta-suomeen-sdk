@@ -1,18 +1,18 @@
-use core::fmt;
-use std::{collections::HashMap, fmt::Display};
-
-use potion::{HtmlError, TypeError};
-use serde::Serialize;
+use potion::TypeError;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub type Uuid = i32;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash, Deserialize,
+)]
 #[sqlx(type_name = "user_type", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 pub enum UserRole {
-    Admin,
     User,
+    Creator,
+    Admin,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
@@ -128,6 +128,109 @@ pub enum Retailer {
     Alko,
 }
 
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[sqlx(type_name = "drink_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum IncredientOrder {
+    Alphabetical,
+    AbvAsc,
+    AbvDesc,
+    PriceSuperalkoAsc,
+    PriceSuperalkoDesc,
+    PriceAlkoAsc,
+    PriceAlkoDesc,
+}
+
+impl TryFrom<Value> for IncredientOrder {
+    type Error = TypeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            Some(value) => match value {
+                "alphabetical" => Ok(Self::Alphabetical),
+                "abv_asc " => Ok(Self::AbvAsc),
+                "abv_desc" => Ok(Self::AbvDesc),
+                "price_superalko_asc" => Ok(Self::PriceSuperalkoAsc),
+                "price_superalko_desc" => Ok(Self::PriceSuperalkoDesc),
+                "price_alko_asc" => Ok(Self::PriceAlkoAsc),
+                "price_alko_desc" => Ok(Self::PriceAlkoDesc),
+                _ => Err(TypeError::new("Invalid variant")),
+            },
+            None => return Err(TypeError::new("Failed to parse value as string")),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[sqlx(type_name = "drink_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum RecipeOrder {
+    Alphabetical,
+    AbvAsc,
+    AbvDesc,
+    VolumeAsc,
+    VolumeDesc,
+    ServingsAsc,
+    ServingsDesc,
+    IncredientCountAsc,
+    IncredientCountDesc,
+    PriceSuperalkoAsc,
+    PriceSuperalkoDesc,
+    PriceAlkoAsc,
+    PriceAlkoDesc,
+}
+
+impl TryFrom<Value> for RecipeOrder {
+    type Error = TypeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            Some(value) => match value {
+                "alphabetical" => Ok(Self::Alphabetical),
+                "abv_asc" => Ok(Self::AbvAsc),
+                "abv_desc" => Ok(Self::AbvDesc),
+                "volume_asc" => Ok(Self::VolumeAsc),
+                "volume_desc" => Ok(Self::VolumeDesc),
+                "servings_asc" => Ok(Self::ServingsAsc),
+                "servings_desc" => Ok(Self::ServingsDesc),
+                "incredient_count_asc" => Ok(Self::IncredientCountAsc),
+                "incredient_count_desc" => Ok(Self::IncredientCountDesc),
+                "price_superalko_asc" => Ok(Self::PriceSuperalkoAsc),
+                "price_superalko_desc" => Ok(Self::PriceSuperalkoDesc),
+                "price_alko_asc" => Ok(Self::PriceAlkoAsc),
+                "price_alko_desc" => Ok(Self::PriceAlkoDesc),
+                _ => Err(TypeError::new("Invalid variant")),
+            },
+            None => return Err(TypeError::new("Failed to parse value as string")),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[sqlx(type_name = "drink_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum RecipeAvailability {
+    Any,
+    Alko,
+    Superalko,
+}
+
+impl TryFrom<Value> for RecipeAvailability {
+    type Error = TypeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            Some(value) => match value {
+                "any" => Ok(Self::Any),
+                "alko" => Ok(Self::Alko),
+                "superalko" => Ok(Self::Superalko),
+                _ => Err(TypeError::new("Invalid variant")),
+            },
+            None => return Err(TypeError::new("Failed to parse value as string")),
+        }
+    }
+}
+
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
 pub struct User {
     pub id: Uuid,
@@ -160,6 +263,34 @@ pub struct Incredient {
 
     pub alko_product_count: i32,
     pub superalko_product_count: i32,
+
+    pub use_static_filter: bool,
+    pub static_filter: Option<i32>,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+pub struct IncredientRow {
+    pub id: Uuid,
+    pub r#type: ProductType,
+    pub author_id: Uuid,
+    pub name: String,
+
+    pub abv_average: f64,
+    pub abv_max: f64,
+    pub abv_min: f64,
+
+    pub alko_price_average: f64,
+    pub alko_price_max: f64,
+    pub alko_price_min: f64,
+
+    pub superalko_price_average: f64,
+    pub superalko_price_max: f64,
+    pub superalko_price_min: f64,
+
+    pub alko_product_count: i32,
+    pub superalko_product_count: i32,
+
+    pub count: i64,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -193,7 +324,17 @@ pub struct Product {
 
     pub checksum: String,
     pub count: i64,
-    pub retailer: Retailer
+    pub retailer: Retailer,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+pub struct ProductRow {
+    pub id: Uuid,
+    pub name: String,
+    pub href: String,
+    pub img: String,
+
+    pub count: i64,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -234,7 +375,11 @@ pub struct Recipe {
 
     pub total_volume: f64,
     pub standard_servings: f64,
-    pub price_per_serving: f64,
+    pub alko_price_per_serving: f64,
+    pub superalko_price_per_serving: f64,
+
+    pub alko_aer: f64,
+    pub superalko_aer: f64,
 
     pub abv_average: f64,
     pub abv_max: f64,
@@ -256,6 +401,43 @@ pub struct Recipe {
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+pub struct RecipeRow {
+    pub id: Uuid,
+    pub r#type: RecipeType,
+
+    pub author_id: Uuid,
+    pub name: String,
+
+    pub total_volume: f64,
+    pub standard_servings: f64,
+    pub alko_price_per_serving: f64,
+    pub superalko_price_per_serving: f64,
+
+    pub alko_aer: f64,
+    pub superalko_aer: f64,
+
+    pub abv_average: f64,
+    pub abv_max: f64,
+    pub abv_min: f64,
+
+    pub alko_price_max: f64,
+    pub alko_price_min: f64,
+    pub alko_price_average: f64,
+
+    pub superalko_price_max: f64,
+    pub superalko_price_min: f64,
+    pub superalko_price_average: f64,
+
+    pub incredient_count: i32,
+    pub favorite_count: i32,
+
+    pub available_superalko: bool,
+    pub available_alko: bool,
+
+    pub count: i64,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
 pub struct RecipePart {
     pub recipe_id: Uuid,
     pub incredient_id: Uuid,
@@ -265,23 +447,28 @@ pub struct RecipePart {
 }
 
 #[derive(Serialize)]
-pub struct IngredientsForDrink{
+pub struct IngredientsForDrink {
     pub recipe_id: Uuid,
     pub recipe_parts: Vec<RecipePartNoId>,
 }
 
 // PERF: Name is not a needed part, for it can be gotten elsewhere
 #[derive(Serialize)]
-pub struct RecipePartNoId{
+pub struct RecipePartNoId {
     pub ingredient_id: Uuid,
     pub amount: i32,
     pub name: String,
-    pub unit: UnitType
+    pub unit: UnitType,
 }
 
 impl From<RecipePart> for RecipePartNoId {
     fn from(value: RecipePart) -> Self {
-        RecipePartNoId{ ingredient_id: value.incredient_id, amount: value.amount, name: value.name, unit: value.unit }
+        RecipePartNoId {
+            ingredient_id: value.incredient_id,
+            amount: value.amount,
+            name: value.name,
+            unit: value.unit,
+        }
     }
 }
 
@@ -289,7 +476,12 @@ impl From<RecipePart> for RecipePartNoId {
 pub struct RecipeCacheData {
     pub total_volume: f64,
     pub standard_servings: f64,
-    pub price_per_serving: f64,
+
+    pub alko_price_per_serving: f64,
+    pub superalko_price_per_serving: f64,
+
+    pub alko_aer: f64,
+    pub superalko_aer: f64,
 
     pub abv_average: f64,
     pub abv_max: f64,

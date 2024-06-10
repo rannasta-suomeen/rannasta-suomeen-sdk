@@ -1,5 +1,3 @@
-use sqlx::error::{DatabaseError, ErrorKind};
-
 use potion::Error;
 
 pub struct QueryError {
@@ -47,6 +45,7 @@ impl Into<Error> for QueryError {
         Error {
             code: 500,
             info: Some(self.info),
+            redirect: None,
         }
     }
 }

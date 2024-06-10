@@ -1,42 +1,39 @@
 use std::convert::Infallible;
 
-use warp::{
-    reject::{self, Rejection},
-    Filter,
-};
+use potion::HtmlError;
+use warp::Filter;
 
-use super::jwt::{verify_jwt_session, JwtSessionData};
+pub type Session = Result<SessionData, potion::Error>;
 
-#[derive(Debug)]
-struct Unauthorized;
+use crate::authentication::jwt::{verify_jwt_session, SessionData};
 
-impl reject::Reject for Unauthorized {}
-
-pub fn with_auth() -> impl Filter<Extract = ((),), Error = Rejection> + Copy {
-    warp::cookie::<String>("session").and_then(|session: String| async move {
-        if let Ok(_) = verify_jwt_session(session) {
-            Ok(())
-        } else {
-            Err(warp::reject::custom(Unauthorized))
+pub fn with_session() -> impl Filter<Extract = (Session,), Error = Infallible> + Copy {
+    warp::cookie::optional::<String>("session").then(|session: Option<String>| async move {
+        if session.is_none() {
+            return Err(potion::Error::from(
+                HtmlError::InvalidSession.new("Invalid session"),
+            ));
         }
-    })
-}
 
-pub fn with_session() -> impl Filter<Extract = (JwtSessionData,), Error = Rejection> + Copy {
-    warp::cookie::<String>("session").and_then(|session: String| async move {
-        if let Ok(data) = verify_jwt_session(session) {
-            Ok(data)
+        if let Ok(data) = verify_jwt_session(session.unwrap()) {
+            return Ok::<SessionData, potion::Error>(data.into());
         } else {
-            Err(warp::reject::custom(Unauthorized))
+            return Err(potion::Error::from(
+                HtmlError::InvalidSession.new("Missing session"),
+            ));
         }
     })
 }
 
 pub fn with_possible_session(
-) -> impl Filter<Extract = (Option<JwtSessionData>,), Error = Rejection> + Copy {
-    warp::cookie::<String>("session").map(move |session: String| {
-        if let Ok(data) = verify_jwt_session(session) {
-            Some(data)
+) -> impl Filter<Extract = (Option<SessionData>,), Error = Infallible> + Copy {
+    warp::cookie::optional::<String>("session").map(move |session: Option<String>| {
+        if session.is_none() {
+            return None;
+        }
+
+        if let Ok(data) = verify_jwt_session(session.unwrap()) {
+            Some(data.into())
         } else {
             None
         }

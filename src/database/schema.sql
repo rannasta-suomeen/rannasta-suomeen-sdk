@@ -20,7 +20,7 @@ DROP TYPE IF EXISTS retailer CASCADE;
 
 
 
-CREATE TYPE user_type AS ENUM ('user', 'admin');
+CREATE TYPE user_type AS ENUM ('user', 'creator', 'admin');
 CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_product', 'common', 'mixer', 'grocery' );
 CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch' );
 CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'kpl' );
@@ -55,7 +55,11 @@ CREATE TABLE drink_recipes (
     total_volume FLOAT NOT NULL DEFAULT 0.0,
 
     standard_servings FLOAT NOT NULL DEFAULT 0.0,
-    price_per_serving FLOAT NOT NULL DEFAULT 0.0,
+    alko_price_per_serving FLOAT NOT NULL DEFAULT 0.0,
+    superalko_price_per_serving FLOAT NOT NULL DEFAULT 0.0,
+
+    alko_aer FLOAT NOT NULL DEFAULT 0,
+    superalko_aer FLOAT NOT NULL DEFAULT 0,
 
     abv_min FLOAT NOT NULL DEFAULT 0.0,
     abv_max FLOAT NOT NULL DEFAULT 0.0,
@@ -103,6 +107,9 @@ CREATE TABLE drink_incredients (
 
     alko_product_count INTEGER NOT NULL DEFAULT 0,
     superalko_product_count INTEGER NOT NULL DEFAULT 0,
+
+    use_static_filter BOOLEAN DEFAULT false,
+    static_filter INTEGER NULL DEFAULT NULL,
 
     FOREIGN KEY (author_id) REFERENCES users (id),
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
@@ -192,12 +199,6 @@ CREATE TABLE user_favorites(
 
     PRIMARY KEY (user_id, drink_id)
 );
-
-
-/* Debugging */
-INSERT INTO users (uid, username, password) VALUES ('admin', 'test', 'test');
-INSERT INTO recipes DEFAULT VALUES;
-INSERT INTO drink_incredients (type, author_id, name, recipe_id, alcohol_percentage) VALUES ('common', 1, 'vesi', NULL, 0.0);
 
 
 /* sync recipes */

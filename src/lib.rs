@@ -7,6 +7,7 @@ mod authentication {
     pub mod cryptography;
     pub mod jwt;
     pub mod middleware;
+    pub mod permissions;
 }
 mod constants;
 
