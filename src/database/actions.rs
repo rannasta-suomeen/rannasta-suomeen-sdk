@@ -14,8 +14,7 @@ use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     jwt::SessionData,
     schema::{
-        IncredientCacheData, IncredientOrder, IncredientRow, IngredientsForDrink, ProductRow,
-        RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid,
+        IncredientCacheData, IncredientOrder, IncredientRow, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
     },
     INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
 };
@@ -863,6 +862,19 @@ pub async fn get_product_subcategory(
         .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(rows)
+}
+
+pub async fn fetch_all_products(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<Product>, potion::Error> {
+    let rows: Vec<Product> =
+            sqlx::query_as("
+                            SELECT * FROM products
+                        ")
+                            .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
+    ;
 
     Ok(rows)
 }

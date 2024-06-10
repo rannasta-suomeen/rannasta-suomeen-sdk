@@ -323,7 +323,6 @@ pub struct Product {
     pub unit_price: f64,
 
     pub checksum: String,
-    pub count: i64,
     pub retailer: Retailer,
 }
 
