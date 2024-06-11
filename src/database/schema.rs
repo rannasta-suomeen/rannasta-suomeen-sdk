@@ -343,6 +343,18 @@ pub struct IncredientFilterObject {
     pub product_name: String,
 }
 
+#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+pub struct IncredientFilterObjectNoName {
+    pub incredient_id: Uuid,
+    pub product_id: Uuid,
+}
+
+#[derive(Serialize)]
+pub struct IngredientFilterList{
+    pub ingredient_id: Uuid,
+    pub product_ids: Vec<Uuid>
+}
+
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
 pub struct IncredientCacheData {
     pub abv_average: f64,

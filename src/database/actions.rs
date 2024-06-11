@@ -14,7 +14,7 @@ use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     jwt::SessionData,
     schema::{
-        IncredientCacheData, IncredientOrder, IncredientRow, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
+        IncredientCacheData, IncredientFilterObjectNoName, IncredientOrder, IncredientRow, IngredientFilterList, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
     },
     INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
 };
@@ -546,6 +546,27 @@ pub async fn get_incredient_mut(
         },
         None => Err(HtmlError::InvalidRequest.new("No incredient exists with spcified id")),
     }
+}
+
+pub async fn get_product_filter_noname_all(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<IngredientFilterList>, potion::Error> {
+    let rows: Vec<IncredientFilterObjectNoName> = sqlx::query_as(
+        "
+        SELECT * FROM incredient_product_filters
+    ",
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+    let mut hashmap: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+    rows.into_iter().for_each(|x| match hashmap.get_mut(&x.incredient_id) {
+        Some(v) => v.push(x.product_id),
+        None => {
+            hashmap.insert(x.incredient_id, vec![x.product_id]);}
+    });
+    let res = hashmap.into_iter().map(|(k, v)| IngredientFilterList{ ingredient_id: k, product_ids: v }).collect();
+    Ok(res)
 }
 
 pub async fn get_product_filter(
