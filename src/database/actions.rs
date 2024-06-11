@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use crate::{
     authentication::{
@@ -7,8 +7,8 @@ use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     jwt::SessionData,
     schema::{
-        IncredientCacheData, IncredientOrder, IncredientRow, ProductRow, RecipeAvailability,
-        RecipeCacheData, RecipeOrder, RecipeRow,
+        Cabinet, CabinetProduct, IncredientCacheData, IncredientOrder, IncredientRow, Product,
+        ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipeRow,
     },
     INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
 };
@@ -797,6 +797,19 @@ pub async fn update_incredient_cached_data(
     Ok(())
 }
 
+pub async fn get_product(
+    id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<Option<Product>, potion::Error> {
+    let product: Option<Product> = sqlx::query_as("SELECT * FROM products WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(product)
+}
+
 pub async fn get_product_categories(
     pool: Arc<Pool<Postgres>>,
 ) -> Result<Vec<Category>, potion::Error> {
@@ -850,13 +863,13 @@ pub async fn get_product_subcategory(
 
 pub async fn fetch_products(
     search: String,
-    category_id: i32,
+    category_id: Option<i32>,
     sub_category: Option<i32>,
     offset: i64,
     pool: Arc<Pool<Postgres>>,
 ) -> Result<PageContext<ProductRow>, potion::Error> {
-    let rows: Vec<ProductRow> = match sub_category {
-        Some(subcategory_id) => {
+    let rows: Vec<ProductRow> = match (category_id, sub_category) {
+        (Some(category_id), Some(subcategory_id)) => {
             sqlx::query_as("
                 SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 LIMIT $4 OFFSET $5
             ")
@@ -867,7 +880,7 @@ pub async fn fetch_products(
                 .bind(offset)
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
-        None => {
+        (Some(category_id), None) => {
             sqlx::query_as("
                 SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
             ")
@@ -877,6 +890,25 @@ pub async fn fetch_products(
                 .bind(offset)
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
+        (None, Some(subcategory_id)) => {
+            sqlx::query_as("
+                SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
+            ")
+                .bind(subcategory_id)
+                .bind(search)
+                .bind(PRODUCT_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (None, None) => {
+            sqlx::query_as("
+                SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 LIMIT $2 OFFSET $3
+            ")
+                .bind(search)
+                .bind(PRODUCT_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+        }
     };
 
     let total_count = *&rows.get(0).map(|p| p.count).unwrap_or(0);
@@ -977,3 +1009,202 @@ pub async fn remove_from_favorites(
     Ok(())
 }
 
+pub async fn create_cabinet(
+    name: String,
+    user_id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<i32, potion::Error> {
+    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2)")
+        .bind(user_id)
+        .bind(name)
+        .fetch_one(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(id.0)
+}
+
+pub async fn list_own_cabinets(
+    user_id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<Vec<Cabinet>, potion::Error> {
+    let list: Vec<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE owner_id = $1")
+        .bind(user_id)
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn get_cabinet(
+    id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<Option<Cabinet>, potion::Error> {
+    let cabinet: Option<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(cabinet)
+}
+
+pub async fn get_cabinet_mut(
+    id: i32,
+    session: SessionData,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<Cabinet, potion::Error> {
+    let cabinet = get_cabinet(id, pool.clone()).await?;
+
+    session.authenticate(ActionType::ManageOwnCabinets)?;
+
+    match cabinet {
+        Some(cabinet) => match session.authenticate(ActionType::ManageAllCabinets) {
+            Ok(_) => Ok(cabinet),
+            Err(_) => {
+                if cabinet.owner_id != session.user_id {
+                    Err(HtmlError::Unauthorized.default())
+                } else {
+                    Ok(cabinet)
+                }
+            }
+        },
+        None => Err(HtmlError::InvalidRequest.new("No recipe exists with spcified id")),
+    }
+}
+
+pub async fn list_cabinet_products(
+    id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<Vec<CabinetProduct>, potion::Error> {
+    let list: Vec<CabinetProduct> =
+        sqlx::query_as("SELECT * FROM cabinet_products WHERE cabinet_id = $1")
+            .bind(id)
+            .fetch_all(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn add_to_cabinet(
+    id: i32,
+    product_id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<(), potion::Error> {
+    let product = get_product(product_id, pool.clone()).await?;
+    if product.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Product with specified id doesn't exists"));
+    }
+    let product = product.unwrap();
+
+    let result = sqlx::query(
+        "INSERT INTO cabinet_products (cabinet_id, product_id, name, img, href, abv)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT DO NOTHING RETURNING *",
+    )
+    .bind(id)
+    .bind(product.id)
+    .bind(product.name)
+    .bind(product.img)
+    .bind(product.href)
+    .bind(product.abv)
+    .execute(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    if result.rows_affected() <= 0 {
+        return Err(HtmlError::InvalidRequest
+            .new("Product is already in the cabinet")
+            .into());
+    }
+
+    Ok(())
+}
+
+pub async fn remove_from_cabinet(
+    id: i32,
+    product_id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<(), potion::Error> {
+    let result =
+        sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1 AND product_id = $2")
+            .bind(id)
+            .bind(product_id)
+            .execute(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    if result.rows_affected() <= 0 {
+        return Err(HtmlError::InvalidRequest
+            .new("Product was already removed from the cabinet")
+            .into());
+    }
+
+    Ok(())
+}
+
+pub async fn set_product_unusable(
+    id: i32,
+    product_id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<(), potion::Error> {
+    sqlx::query(
+        "UPDATE cabinet_products SET usable = false WHERE cabinet_id = $1 AND product_id = $2",
+    )
+    .bind(id)
+    .bind(product_id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
+pub async fn set_product_usable(
+    id: i32,
+    product_id: i32,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<(), potion::Error> {
+    sqlx::query(
+        "UPDATE cabinet_products SET usable = true WHERE cabinet_id = $1 AND product_id = $2",
+    )
+    .bind(id)
+    .bind(product_id)
+    .execute(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
+pub async fn set_cabinet_name(
+    id: i32,
+    name: String,
+    pool: Arc<Pool<Postgres>>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE cabinets SET name = $1 WHERE id = $2")
+        .bind(name)
+        .bind(id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
+/*
+CREATE TABLE cabinet_products (
+    cabinet_id SERIAL NOT NULL,
+    product_id SERIAL NOT NULL,
+
+    product_name TEXT UNIQUE NOT NULL,
+    product_img TEXT UNIQUE NOT NULL,
+    product_href TEXT UNIQUE NOT NULL,
+
+    amount_ml INT NULL DEFAULT NULL,
+
+    PRIMARY KEY (cabinet_id, product_id)
+);
+*/

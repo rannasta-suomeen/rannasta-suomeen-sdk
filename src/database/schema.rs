@@ -471,3 +471,24 @@ pub struct RecipeCacheData {
     pub available_superalko: bool,
     pub available_alko: bool,
 }
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+pub struct Cabinet {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub name: String,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+pub struct CabinetProduct {
+    pub cabinet_id: Uuid,
+    pub product_id: Uuid,
+
+    pub name: String,
+    pub img: String,
+    pub href: String,
+    pub abv: f64,
+
+    pub amount_ml: Option<i32>,
+    pub usable: bool,
+}

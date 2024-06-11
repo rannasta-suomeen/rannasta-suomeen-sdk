@@ -33,7 +33,7 @@ impl JwtSessionData {
             username,
             user_uid: uid,
             iat,
-            exp
+            exp,
         }
     }
 }
@@ -80,12 +80,15 @@ pub fn generate_jwt_session(user: &User) -> String {
 pub fn verify_jwt_session(token: String) -> Result<JwtSessionData, potion::Error> {
     let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
 
-    token.verify_with_key(&key).map_err(|_| HtmlError::InvalidSession.new("Invalid Session; Invalid token")).map(|session: JwtSessionData| {
-        let now = Local::now().timestamp();
+    token
+        .verify_with_key(&key)
+        .map_err(|_| HtmlError::InvalidSession.new("Invalid Session; Invalid token"))
+        .map(|session: JwtSessionData| {
+            let now = Local::now().timestamp();
 
-        if (session.exp - now).is_negative() {
-            return Err(HtmlError::InvalidSession.new("Invalid session; Token expired"));
-        }
-        return Ok(session)
-    })?
+            if (session.exp - now).is_negative() {
+                return Err(HtmlError::InvalidSession.new("Invalid session; Token expired"));
+            }
+            return Ok(session);
+        })?
 }

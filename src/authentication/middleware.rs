@@ -3,7 +3,6 @@ use std::convert::Infallible;
 use potion::HtmlError;
 use warp::Filter;
 
-
 pub type Session = Result<SessionData, potion::Error>;
 
 use crate::authentication::jwt::{verify_jwt_session, SessionData};
@@ -38,6 +37,5 @@ pub fn with_possible_session(
         } else {
             None
         }
-
     })
 }

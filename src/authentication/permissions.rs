@@ -1,7 +1,13 @@
 use crate::{jwt::SessionData, schema::UserRole};
 
 const ACTION_TABLE: &[(UserRole, &[ActionType])] = &[
-    (UserRole::User, &[ActionType::ManageOwnFavorites]),
+    (
+        UserRole::User,
+        &[
+            ActionType::ManageOwnFavorites,
+            ActionType::ManageOwnCabinets,
+        ],
+    ),
     (
         UserRole::Creator,
         &[
@@ -10,6 +16,7 @@ const ACTION_TABLE: &[(UserRole, &[ActionType])] = &[
             ActionType::CreateRecipes,
             ActionType::ManageOwnRecipes,
             ActionType::ManageOwnIncredients,
+            ActionType::ManageOwnCabinets,
         ],
     ),
     (
@@ -22,6 +29,8 @@ const ACTION_TABLE: &[(UserRole, &[ActionType])] = &[
             ActionType::ManageOwnIncredients,
             ActionType::ManageAllRecipes,
             ActionType::ManageAllIncredients,
+            ActionType::ManageOwnCabinets,
+            ActionType::ManageAllCabinets,
         ],
     ),
 ];
@@ -34,6 +43,9 @@ pub enum ActionType {
     ManageOwnFavorites,
     ManageOwnRecipes,
     ManageOwnIncredients,
+
+    ManageOwnCabinets,
+    ManageAllCabinets,
 
     ManageUsers,
     ManageAllRecipes,
