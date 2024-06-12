@@ -200,6 +200,41 @@ CREATE TABLE user_favorites(
     PRIMARY KEY (user_id, drink_id)
 );
 
+CREATE TABLE cabinets (
+    id SERIAL NOT NULL PRIMARY KEY,
+    owner_id SERIAL NOT NULL,
+    name TEXT UNIQUE NOT NULL,
+
+    access_key TEXT UNIQUE NULL DEFAULT NULL,
+
+    FOREIGN KEY (owner_id) REFERENCES users (id)
+);
+
+CREATE TABLE shared_cabinets (
+    cabinet_id SERIAL NOT NULL,
+    user_id SERIAL NOT NULL,
+
+    FOREIGN KEY (cabinet_id) REFERENCES cabinets (id),
+    FOREIGN KEY (user_id) REFERENCES users (id),
+
+    PRIMARY KEY (user_id, cabinet_id)
+);
+
+CREATE TABLE cabinet_products (
+    cabinet_id SERIAL NOT NULL,
+    product_id SERIAL NOT NULL,
+
+    name TEXT UNIQUE NOT NULL,
+    img TEXT UNIQUE NOT NULL,
+    href TEXT UNIQUE NOT NULL,
+    abv FLOAT NOT NULL DEFAULT 0,
+
+    usable BOOLEAN DEFAULT true,    
+    amount_ml INT NULL DEFAULT NULL,
+
+    PRIMARY KEY (cabinet_id, product_id)
+);
+
 
 /* sync recipes */
 CREATE OR REPLACE FUNCTION recipe_update_notify() RETURNS trigger AS $$
