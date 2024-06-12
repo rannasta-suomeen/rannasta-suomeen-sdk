@@ -203,7 +203,7 @@ CREATE TABLE user_favorites(
 CREATE TABLE cabinets (
     id SERIAL NOT NULL PRIMARY KEY,
     owner_id SERIAL NOT NULL,
-    name TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
 
     access_key TEXT UNIQUE NULL DEFAULT NULL,
 
@@ -224,9 +224,9 @@ CREATE TABLE cabinet_products (
     cabinet_id SERIAL NOT NULL,
     product_id SERIAL NOT NULL,
 
-    name TEXT UNIQUE NOT NULL,
-    img TEXT UNIQUE NOT NULL,
-    href TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    img TEXT NOT NULL,
+    href TEXT NOT NULL,
     abv FLOAT NOT NULL DEFAULT 0,
 
     usable BOOLEAN DEFAULT true,    

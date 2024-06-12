@@ -1071,7 +1071,7 @@ pub async fn create_cabinet(
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
-    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING id")
+    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING *")
         .bind(user_id)
         .bind(name)
         .fetch_one(pool)
@@ -1114,7 +1114,7 @@ pub async fn get_cabinet(
 ) -> Result<Option<Cabinet>, potion::Error> {
     let cabinet: Option<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE id = $1")
         .bind(id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
