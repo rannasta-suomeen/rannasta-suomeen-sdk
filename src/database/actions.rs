@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     authentication::{
@@ -7,8 +7,7 @@ use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     jwt::SessionData,
     schema::{
-        Cabinet, CabinetProduct, IncredientCacheData, IncredientOrder, IncredientRow, Product,
-        ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipeRow,
+        Cabinet, CabinetProduct, IncredientCacheData, IncredientOrder, IncredientRow, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
     },
     INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
 };
@@ -24,8 +23,8 @@ use super::{
 };
 
 pub async fn get_user(
-    pool: Arc<Pool<Postgres>>,
-    username: String,
+    pool: &Pool<Postgres>,
+    username: &str,
 ) -> Result<Option<User>, potion::Error> {
     let row: Option<User> = sqlx::query_as("SELECT * FROM users WHERE username = $1")
         .bind(username)
@@ -36,10 +35,11 @@ pub async fn get_user(
     Ok(row)
 }
 
+/// Creates a user with username and password, which is the hashed version of their password
 pub async fn register_user(
-    username: String,
-    password: String,
-    pool: Arc<Pool<Postgres>>,
+    username: &str,
+    password: &str,
+    pool: &Pool<Postgres>,
 ) -> Result<bool, potion::Error> {
     let query = sqlx::query(
         "
@@ -58,9 +58,9 @@ pub async fn register_user(
 }
 
 pub async fn login_user(
-    username: String,
-    password: String,
-    pool: Arc<Pool<Postgres>>,
+    username: &str,
+    password: &str,
+    pool: &Pool<Postgres>,
 ) -> Result<String, potion::Error> {
     let user = get_user(pool, username).await?;
     if user.is_none() {
@@ -68,7 +68,7 @@ pub async fn login_user(
     }
 
     let user = user.unwrap();
-    let authenticated = verify_password(password, String::from(&user.password))
+    let authenticated = verify_password(password, &user.password)
         .map_err(|_e| panic!("!"))
         .unwrap();
     if !authenticated {
@@ -80,7 +80,7 @@ pub async fn login_user(
     Ok(session)
 }
 
-pub async fn list_recipes(pool: Arc<Pool<Postgres>>) -> Result<Vec<Recipe>, potion::Error> {
+pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {
     let rows: Vec<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes;")
         .fetch_all(&*pool)
         .await
@@ -95,7 +95,7 @@ pub async fn fetch_recipes(
     availability: Option<RecipeAvailability>,
     offset: i64,
     search: String,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<PageContext<RecipeRow>, potion::Error> {
     let availability = availability
         .map(|availability| match availability {
@@ -147,7 +147,7 @@ pub async fn fetch_recipes(
 }
 
 pub async fn list_recipe_parts(
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
     recipe_id: i32,
 ) -> Result<Vec<RecipePart>, potion::Error> {
     let rows: Vec<RecipePart> = sqlx::query_as("
@@ -157,19 +157,44 @@ pub async fn list_recipe_parts(
         WHERE rp.recipe_id = $1
     ")
     .bind(recipe_id)
-    .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+    .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)
+}
+
+pub async fn list_all_recipe_parts(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<IngredientsForDrink>, potion::Error> {
+    let filters: Vec<RecipePart> = sqlx::query_as("SELECT r.recipe_id AS recipe_id, r.incredient_id AS incredient_id, r.amount AS amount, r.unit AS unit, d.name AS name
+                                                  FROM recipe_parts r
+                                                  INNER JOIN drink_incredients d ON d.id = r.incredient_id")
+        .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
+    let mut hashmap: HashMap<Uuid, Vec<RecipePartNoId>> = HashMap::new();
+    filters
+        .into_iter()
+        .for_each(|x| match hashmap.get_mut(&x.recipe_id) {
+            Some(v) => v.push(x.into()),
+            None => {
+                hashmap.insert(x.recipe_id, vec![x.into()]);
+            }
+        });
+    Ok(hashmap
+        .into_iter()
+        .map(|(recipe_id, recipe_parts)| IngredientsForDrink {
+            recipe_id,
+            recipe_parts,
+        })
+        .collect())
 }
 
 pub async fn create_recipe(
     category: RecipeType,
     user_id: i32,
     name: String,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
     let recipe: (i32,) = sqlx::query_as("INSERT INTO recipes DEFAULT VALUES RETURNING id")
-        .fetch_one(&*pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -185,17 +210,14 @@ pub async fn create_recipe(
     .bind(user_id)
     .bind(name)
     .bind(recipe_id)
-    .fetch_one(&*pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
     Ok(id.0)
 }
 
-pub async fn get_recipe(
-    id: i32,
-    pool: Arc<Pool<Postgres>>,
-) -> Result<Option<Recipe>, potion::Error> {
+pub async fn get_recipe(id: i32, pool: &Pool<Postgres>) -> Result<Option<Recipe>, potion::Error> {
     let row: Option<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes WHERE id = $1")
         .bind(id)
         .fetch_optional(&*pool)
@@ -208,10 +230,9 @@ pub async fn get_recipe(
 pub async fn get_recipe_mut(
     id: i32,
     session: SessionData,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Recipe, potion::Error> {
-    let recipe = get_recipe(id, pool.clone()).await?;
-
+    let recipe = get_recipe(id, pool).await?;
     session.authenticate(ActionType::ManageOwnRecipes)?;
 
     match recipe {
@@ -234,7 +255,7 @@ pub async fn update_recipe_info(
     name: String,
     category: RecipeType,
     info: String,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE drink_recipes SET name = $1, type = $2, info = $3 WHERE id = $4")
         .bind(name)
@@ -253,7 +274,7 @@ pub async fn add_to_recipe(
     base: i32,
     unit: UnitType,
     amount: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let amount_ml = unit.convert(amount.into(), UnitType::Ml).1;
 
@@ -282,7 +303,7 @@ pub async fn add_to_recipe(
 pub async fn remove_from_recipe(
     recipe_id: i32,
     incredient_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query(
         "
@@ -302,7 +323,7 @@ pub async fn remove_from_recipe(
 
 pub async fn calculate_recipe_cached_data(
     recipe_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<RecipeCacheData, potion::Error> {
     let data: Option<RecipeCacheData> = sqlx::query_as("
         SELECT COUNT(e1) AS incredient_count,
@@ -363,9 +384,9 @@ pub async fn calculate_recipe_cached_data(
 
 pub async fn update_recipe_cached_data(
     recipe_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    let data = calculate_recipe_cached_data(recipe_id, pool.clone()).await?;
+    let data = calculate_recipe_cached_data(recipe_id, pool).await?;
 
     sqlx::query(
         "
@@ -417,7 +438,7 @@ pub async fn update_recipe_cached_data(
     Ok(())
 }
 
-pub async fn list_incredients(pool: Arc<Pool<Postgres>>) -> Result<Vec<Incredient>, potion::Error> {
+pub async fn list_incredients(pool: &Pool<Postgres>) -> Result<Vec<Incredient>, potion::Error> {
     let rows: Vec<Incredient> = sqlx::query_as("SELECT * FROM drink_incredients;")
         .fetch_all(&*pool)
         .await
@@ -431,7 +452,7 @@ pub async fn fetch_incredients(
     order: Option<IncredientOrder>,
     offset: i64,
     search: String,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<PageContext<IncredientRow>, potion::Error> {
     let order = order
         .map(|order| match order {
@@ -452,14 +473,14 @@ pub async fn fetch_incredients(
                 .bind(search)
                 .bind(INCREDIENT_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         None => {
             sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.name ILIKE $1 ORDER BY {order} LIMIT $2 OFFSET $3"))
                 .bind(search)
                 .bind(INCREDIENT_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
     };
 
@@ -472,7 +493,7 @@ pub async fn create_incredient(
     category: Option<ProductType>,
     name: String,
     user_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
     let result: (i32,) = sqlx::query_as(
         "
@@ -484,7 +505,7 @@ pub async fn create_incredient(
     .bind(category)
     .bind(user_id)
     .bind(name)
-    .fetch_one(&*pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -493,7 +514,7 @@ pub async fn create_incredient(
 
 pub async fn get_incredient(
     id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Option<Incredient>, potion::Error> {
     let row: Option<Incredient> = sqlx::query_as("SELECT * FROM drink_incredients WHERE id = $1")
         .bind(id)
@@ -507,9 +528,9 @@ pub async fn get_incredient(
 pub async fn get_incredient_mut(
     id: i32,
     session: SessionData,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Incredient, potion::Error> {
-    let incredient = get_incredient(id, pool.clone()).await?;
+    let incredient = get_incredient(id, pool).await?;
 
     session.authenticate(ActionType::ManageOwnIncredients)?;
 
@@ -529,7 +550,7 @@ pub async fn get_incredient_mut(
 }
 
 pub async fn get_product_filter(
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
     incredient_id: i32,
 ) -> Result<Vec<IncredientFilterObject>, potion::Error> {
     let rows: Vec<IncredientFilterObject> = sqlx::query_as(
@@ -552,7 +573,7 @@ pub async fn update_incredient_info(
     id: i32,
     category: Option<ProductType>,
     name: String,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE drink_incredients SET name = $1, type = $2 WHERE id = $3")
         .bind(name)
@@ -569,7 +590,7 @@ pub async fn update_incredient_price(
     id: i32,
     min: f64,
     max: f64,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let avg = (min + max) / 2.0;
 
@@ -601,8 +622,8 @@ pub async fn update_incredient_price(
 pub async fn update_incredient_product_category(
     id: i32,
     category: i32,
+    pool: &Pool<Postgres>,
     use_static_filter: bool,
-    pool: Arc<Pool<Postgres>>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE drink_incredients SET category = $1, use_static_filter = $2 WHERE id = $3")
         .bind(category)
@@ -618,7 +639,7 @@ pub async fn update_incredient_product_category(
 pub async fn set_product_category(
     id: i32,
     subcategory: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE drink_incredients SET static_filter = $1 WHERE id = $2")
         .bind(subcategory)
@@ -635,7 +656,7 @@ pub async fn set_product_category(
 pub async fn insert_product_filter(
     id: i32,
     id_map: Vec<i32>,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     if id_map.len() > 0 {
         let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
@@ -661,7 +682,7 @@ pub async fn insert_product_filter(
 pub async fn remove_product_filter(
     id: i32,
     product_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query(
         "DELETE FROM incredient_product_filters WHERE product_id = $1 AND incredient_id = $2",
@@ -679,9 +700,9 @@ pub async fn remove_product_filter(
 
 pub async fn calculate_incredient_cached_data(
     incredient_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<IncredientCacheData, potion::Error> {
-    let incredient = get_incredient(incredient_id, pool.clone()).await?;
+    let incredient = get_incredient(incredient_id, pool).await?;
     if incredient.is_none() {
         return Err(HtmlError::InvalidRequest.default().into());
     }
@@ -753,9 +774,9 @@ pub async fn calculate_incredient_cached_data(
 
 pub async fn update_incredient_cached_data(
     incredient_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    let data = calculate_incredient_cached_data(incredient_id, pool.clone()).await?;
+    let data = calculate_incredient_cached_data(incredient_id, pool).await?;
 
     sqlx::query(
         "
@@ -799,7 +820,7 @@ pub async fn update_incredient_cached_data(
 
 pub async fn get_product(
     id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Option<Product>, potion::Error> {
     let product: Option<Product> = sqlx::query_as("SELECT * FROM products WHERE id = $1")
         .bind(id)
@@ -811,7 +832,7 @@ pub async fn get_product(
 }
 
 pub async fn get_product_categories(
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<Category>, potion::Error> {
     let rows: Vec<Category> = sqlx::query_as("SELECT * FROM categories")
         .fetch_all(&*pool)
@@ -822,13 +843,13 @@ pub async fn get_product_categories(
 }
 
 pub async fn get_product_subcategories(
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
     category_id: i32,
 ) -> Result<Vec<SubCategory>, potion::Error> {
     let rows: Vec<SubCategory> =
         sqlx::query_as("SELECT * FROM subcategories WHERE category_id = $1")
             .bind(category_id)
-            .fetch_all(&*pool)
+            .fetch_all(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
@@ -837,11 +858,11 @@ pub async fn get_product_subcategories(
 
 pub async fn get_product_category(
     category_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Option<Category>, potion::Error> {
     let rows: Option<Category> = sqlx::query_as("SELECT * FROM categories WHERE id = $1")
         .bind(category_id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -850,11 +871,11 @@ pub async fn get_product_category(
 
 pub async fn get_product_subcategory(
     subcategory_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Option<SubCategory>, potion::Error> {
     let rows: Option<SubCategory> = sqlx::query_as("SELECT * FROM subcategories WHERE id = $1")
         .bind(subcategory_id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -866,7 +887,7 @@ pub async fn fetch_products(
     category_id: Option<i32>,
     sub_category: Option<i32>,
     offset: i64,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<PageContext<ProductRow>, potion::Error> {
     let rows: Vec<ProductRow> = match (category_id, sub_category) {
         (Some(category_id), Some(subcategory_id)) => {
@@ -878,7 +899,7 @@ pub async fn fetch_products(
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (Some(category_id), None) => {
             sqlx::query_as("
@@ -888,7 +909,7 @@ pub async fn fetch_products(
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (None, Some(subcategory_id)) => {
             sqlx::query_as("
@@ -920,7 +941,7 @@ pub async fn fetch_products(
 pub async fn is_favorite(
     id: i32,
     user_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<bool, potion::Error> {
     let result: Option<(i32,)> = sqlx::query_as(
         "
@@ -939,7 +960,7 @@ pub async fn is_favorite(
 pub async fn fetch_favorites(
     user_id: i32,
     offset: i64,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<PageContext<RecipeRow>, potion::Error> {
     let rows: Vec<RecipeRow> = sqlx::query_as("
         SELECT r.*, COUNT(rr) OVER() FROM user_favorites f LEFT JOIN drink_recipes r ON r.id = f.drink_id LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE f.user_id = $1 LIMIT $2 OFFSET $3
@@ -947,7 +968,7 @@ pub async fn fetch_favorites(
         .bind(user_id)
         .bind(RECIPE_COUNT_PER_PAGE)
         .bind(offset)
-        .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+        .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
 
     let total_count = *&rows.get(0).map(|p| p.count).unwrap_or(0);
     let page = PageContext::from_rows(rows, total_count, PRODUCT_COUNT_PER_PAGE, offset);
@@ -958,12 +979,12 @@ pub async fn fetch_favorites(
 pub async fn add_to_favorites(
     id: i32,
     user_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let result = sqlx::query("INSERT INTO user_favorites (user_id, drink_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING *;")
         .bind(user_id)
         .bind(id)
-        .execute(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+        .execute(pool).await.map_err(|e| QueryError::from(e).into())?;
 
     if result.rows_affected() <= 0 {
         return Err(HtmlError::InvalidRequest
@@ -974,7 +995,7 @@ pub async fn add_to_favorites(
     sqlx::query("UPDATE drink_recipes SET favorite_count = favorite_count + 1  WHERE id = $1;")
         .bind(user_id)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -984,12 +1005,12 @@ pub async fn add_to_favorites(
 pub async fn remove_from_favorites(
     id: i32,
     user_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let result = sqlx::query("DELETE FROM user_favorites WHERE user_id = $1 AND drink_id = $2")
         .bind(user_id)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -1002,7 +1023,7 @@ pub async fn remove_from_favorites(
     sqlx::query("UPDATE drink_recipes SET favorite_count = favorite_count - 1  WHERE id = $1;")
         .bind(user_id)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -1012,12 +1033,12 @@ pub async fn remove_from_favorites(
 pub async fn create_cabinet(
     name: String,
     user_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
-    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2)")
+    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING *")
         .bind(user_id)
         .bind(name)
-        .fetch_one(&*pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -1026,11 +1047,11 @@ pub async fn create_cabinet(
 
 pub async fn list_own_cabinets(
     user_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<Cabinet>, potion::Error> {
     let list: Vec<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE owner_id = $1")
         .bind(user_id)
-        .fetch_all(&*pool)
+        .fetch_all(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -1039,11 +1060,11 @@ pub async fn list_own_cabinets(
 
 pub async fn get_cabinet(
     id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Option<Cabinet>, potion::Error> {
     let cabinet: Option<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE id = $1")
         .bind(id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -1053,9 +1074,9 @@ pub async fn get_cabinet(
 pub async fn get_cabinet_mut(
     id: i32,
     session: SessionData,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Cabinet, potion::Error> {
-    let cabinet = get_cabinet(id, pool.clone()).await?;
+    let cabinet = get_cabinet(id, pool).await?;
 
     session.authenticate(ActionType::ManageOwnCabinets)?;
 
@@ -1076,12 +1097,12 @@ pub async fn get_cabinet_mut(
 
 pub async fn list_cabinet_products(
     id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<Vec<CabinetProduct>, potion::Error> {
     let list: Vec<CabinetProduct> =
         sqlx::query_as("SELECT * FROM cabinet_products WHERE cabinet_id = $1")
             .bind(id)
-            .fetch_all(&*pool)
+            .fetch_all(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
@@ -1091,9 +1112,9 @@ pub async fn list_cabinet_products(
 pub async fn add_to_cabinet(
     id: i32,
     product_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    let product = get_product(product_id, pool.clone()).await?;
+    let product = get_product(product_id, pool).await?;
     if product.is_none() {
         return Err(HtmlError::InvalidRequest.new("Product with specified id doesn't exists"));
     }
@@ -1110,7 +1131,7 @@ pub async fn add_to_cabinet(
     .bind(product.img)
     .bind(product.href)
     .bind(product.abv)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1126,13 +1147,13 @@ pub async fn add_to_cabinet(
 pub async fn remove_from_cabinet(
     id: i32,
     product_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let result =
         sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1 AND product_id = $2")
             .bind(id)
             .bind(product_id)
-            .execute(&*pool)
+            .execute(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
@@ -1148,14 +1169,14 @@ pub async fn remove_from_cabinet(
 pub async fn set_product_unusable(
     id: i32,
     product_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query(
         "UPDATE cabinet_products SET usable = false WHERE cabinet_id = $1 AND product_id = $2",
     )
     .bind(id)
     .bind(product_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1165,14 +1186,14 @@ pub async fn set_product_unusable(
 pub async fn set_product_usable(
     id: i32,
     product_id: i32,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query(
         "UPDATE cabinet_products SET usable = true WHERE cabinet_id = $1 AND product_id = $2",
     )
     .bind(id)
     .bind(product_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1182,12 +1203,12 @@ pub async fn set_product_usable(
 pub async fn set_cabinet_name(
     id: i32,
     name: String,
-    pool: Arc<Pool<Postgres>>,
+    pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE cabinets SET name = $1 WHERE id = $2")
         .bind(name)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 

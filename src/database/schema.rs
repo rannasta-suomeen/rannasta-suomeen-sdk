@@ -319,9 +319,12 @@ pub struct Product {
     pub subcategory_id: Uuid,
 
     pub abv: f64,
+    pub aer: f64,
     pub unit_price: f64,
 
     pub checksum: String,
+    pub count: i64,
+    pub retailer: Retailer,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -441,6 +444,32 @@ pub struct RecipePart {
     pub amount: i32,
     pub unit: UnitType,
     pub name: String,
+}
+
+#[derive(Serialize)]
+pub struct IngredientsForDrink {
+    pub recipe_id: Uuid,
+    pub recipe_parts: Vec<RecipePartNoId>,
+}
+
+// PERF: Name is not a needed part, for it can be gotten elsewhere
+#[derive(Serialize)]
+pub struct RecipePartNoId {
+    pub ingredient_id: Uuid,
+    pub amount: i32,
+    pub name: String,
+    pub unit: UnitType,
+}
+
+impl From<RecipePart> for RecipePartNoId {
+    fn from(value: RecipePart) -> Self {
+        RecipePartNoId {
+            ingredient_id: value.incredient_id,
+            amount: value.amount,
+            name: value.name,
+            unit: value.unit,
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
