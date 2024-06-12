@@ -1067,14 +1067,14 @@ pub async fn remove_from_favorites(
 }
 
 pub async fn create_cabinet(
-    name: String,
+    name: &str,
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
-    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2)")
+    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING id")
         .bind(user_id)
         .bind(name)
-        .fetch_one(&*pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -1087,11 +1087,25 @@ pub async fn list_own_cabinets(
 ) -> Result<Vec<Cabinet>, potion::Error> {
     let list: Vec<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE owner_id = $1")
         .bind(user_id)
-        .fetch_all(&*pool)
+        .fetch_all(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
     Ok(list)
+}
+
+/// Deletes a cabinet with a given id.
+/// ATTENTION: DOES NOT CHECK FOR OWNERWHIP BY ITSELF
+pub async fn delete_cabinet(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("DELETE FROM cabinets WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+    Ok(())
 }
 
 pub async fn get_cabinet(
@@ -1138,16 +1152,33 @@ pub async fn list_cabinet_products(
     let list: Vec<CabinetProduct> =
         sqlx::query_as("SELECT * FROM cabinet_products WHERE cabinet_id = $1")
             .bind(id)
-            .fetch_all(&*pool)
+            .fetch_all(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
     Ok(list)
 }
 
+pub async fn modify_in_cabinet(
+    id: i32,
+    product_id: i32,
+    amount_ml: Option<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND product_id = $3")
+        .bind(amount_ml)
+        .bind(id)
+        .bind(product_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+        Ok(())
+}
+
 pub async fn add_to_cabinet(
     id: i32,
     product_id: i32,
+    amount_ml: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let product = get_product(product_id, pool).await?;
@@ -1157,8 +1188,8 @@ pub async fn add_to_cabinet(
     let product = product.unwrap();
 
     let result = sqlx::query(
-        "INSERT INTO cabinet_products (cabinet_id, product_id, name, img, href, abv)
-            VALUES ($1, $2, $3, $4, $5, $6)
+        "INSERT INTO cabinet_products (cabinet_id, product_id, name, img, href, abv, amount_ml)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT DO NOTHING RETURNING *",
     )
     .bind(id)
@@ -1167,7 +1198,8 @@ pub async fn add_to_cabinet(
     .bind(product.img)
     .bind(product.href)
     .bind(product.abv)
-    .execute(&*pool)
+    .bind(amount_ml)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1189,7 +1221,7 @@ pub async fn remove_from_cabinet(
         sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1 AND product_id = $2")
             .bind(id)
             .bind(product_id)
-            .execute(&*pool)
+            .execute(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
@@ -1212,7 +1244,7 @@ pub async fn set_product_unusable(
     )
     .bind(id)
     .bind(product_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1229,7 +1261,7 @@ pub async fn set_product_usable(
     )
     .bind(id)
     .bind(product_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1238,13 +1270,13 @@ pub async fn set_product_usable(
 
 pub async fn set_cabinet_name(
     id: i32,
-    name: String,
+    name: &str,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE cabinets SET name = $1 WHERE id = $2")
         .bind(name)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
