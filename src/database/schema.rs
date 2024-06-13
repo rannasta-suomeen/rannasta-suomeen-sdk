@@ -323,7 +323,6 @@ pub struct Product {
     pub unit_price: f64,
 
     pub checksum: String,
-    pub count: i64,
     pub retailer: Retailer,
 }
 
@@ -342,6 +341,18 @@ pub struct IncredientFilterObject {
     pub incredient_id: Uuid,
     pub product_id: Uuid,
     pub product_name: String,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+pub struct IncredientFilterObjectNoName {
+    pub incredient_id: Uuid,
+    pub product_id: Uuid,
+}
+
+#[derive(Serialize)]
+pub struct IngredientFilterList{
+    pub ingredient_id: Uuid,
+    pub product_ids: Vec<Uuid>
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]

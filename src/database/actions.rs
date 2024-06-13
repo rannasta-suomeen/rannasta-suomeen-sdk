@@ -1,18 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
     authentication::{
         cryptography::verify_password, jwt::generate_jwt_session, permissions::ActionType,
-    },
-    constants::PRODUCT_COUNT_PER_PAGE,
-    jwt::SessionData,
-    schema::{
-        Cabinet, CabinetProduct, IncredientCacheData, IncredientOrder, IncredientRow, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
-    },
-    INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
+    }, schema::{Cabinet, CabinetProduct},
 };
-use potion::{pagination::PageContext, HtmlError};
-use sqlx::{Pool, Postgres, QueryBuilder};
 
 use super::{
     error::QueryError,
@@ -21,6 +13,16 @@ use super::{
         SubCategory, UnitType, User,
     },
 };
+use crate::{
+    constants::PRODUCT_COUNT_PER_PAGE,
+    jwt::SessionData,
+    schema::{
+        IncredientCacheData, IncredientFilterObjectNoName, IncredientOrder, IncredientRow, IngredientFilterList, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
+    },
+    INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
+};
+use potion::{pagination::PageContext, HtmlError};
+use sqlx::{Pool, Postgres, QueryBuilder};
 
 pub async fn get_user(
     pool: &Pool<Postgres>,
@@ -549,6 +551,27 @@ pub async fn get_incredient_mut(
     }
 }
 
+pub async fn get_product_filter_noname_all(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<IngredientFilterList>, potion::Error> {
+    let rows: Vec<IncredientFilterObjectNoName> = sqlx::query_as(
+        "
+        SELECT * FROM incredient_product_filters
+    ",
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+    let mut hashmap: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+    rows.into_iter().for_each(|x| match hashmap.get_mut(&x.incredient_id) {
+        Some(v) => v.push(x.product_id),
+        None => {
+            hashmap.insert(x.incredient_id, vec![x.product_id]);}
+    });
+    let res = hashmap.into_iter().map(|(k, v)| IngredientFilterList{ ingredient_id: k, product_ids: v }).collect();
+    Ok(res)
+}
+
 pub async fn get_product_filter(
     pool: &Pool<Postgres>,
     incredient_id: i32,
@@ -882,6 +905,19 @@ pub async fn get_product_subcategory(
     Ok(rows)
 }
 
+pub async fn fetch_all_products(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<Product>, potion::Error> {
+    let rows: Vec<Product> =
+            sqlx::query_as("
+                            SELECT * FROM products
+                        ")
+                            .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
+    ;
+
+    Ok(rows)
+}
+
 pub async fn fetch_products(
     search: String,
     category_id: Option<i32>,
@@ -1031,7 +1067,7 @@ pub async fn remove_from_favorites(
 }
 
 pub async fn create_cabinet(
-    name: String,
+    name: &str,
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
@@ -1056,6 +1092,20 @@ pub async fn list_own_cabinets(
         .map_err(|e| QueryError::from(e).into())?;
 
     Ok(list)
+}
+
+/// Deletes a cabinet with a given id.
+/// ATTENTION: DOES NOT CHECK FOR OWNERWHIP BY ITSELF
+pub async fn delete_cabinet(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("DELETE FROM cabinets WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+    Ok(())
 }
 
 pub async fn get_cabinet(
@@ -1109,9 +1159,26 @@ pub async fn list_cabinet_products(
     Ok(list)
 }
 
+pub async fn modify_in_cabinet(
+    id: i32,
+    product_id: i32,
+    amount_ml: Option<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND product_id = $3")
+        .bind(amount_ml)
+        .bind(id)
+        .bind(product_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+        Ok(())
+}
+
 pub async fn add_to_cabinet(
     id: i32,
     product_id: i32,
+    amount_ml: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let product = get_product(product_id, pool).await?;
@@ -1121,8 +1188,8 @@ pub async fn add_to_cabinet(
     let product = product.unwrap();
 
     let result = sqlx::query(
-        "INSERT INTO cabinet_products (cabinet_id, product_id, name, img, href, abv)
-            VALUES ($1, $2, $3, $4, $5, $6)
+        "INSERT INTO cabinet_products (cabinet_id, product_id, name, img, href, abv, amount_ml)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT DO NOTHING RETURNING *",
     )
     .bind(id)
@@ -1131,6 +1198,7 @@ pub async fn add_to_cabinet(
     .bind(product.img)
     .bind(product.href)
     .bind(product.abv)
+    .bind(amount_ml)
     .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
@@ -1202,7 +1270,7 @@ pub async fn set_product_usable(
 
 pub async fn set_cabinet_name(
     id: i32,
-    name: String,
+    name: &str,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     sqlx::query("UPDATE cabinets SET name = $1 WHERE id = $2")
