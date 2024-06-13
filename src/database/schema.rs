@@ -350,9 +350,9 @@ pub struct IncredientFilterObjectNoName {
 }
 
 #[derive(Serialize)]
-pub struct IngredientFilterList{
+pub struct IngredientFilterList {
     pub ingredient_id: Uuid,
-    pub product_ids: Vec<Uuid>
+    pub product_ids: Vec<Uuid>,
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
@@ -517,12 +517,22 @@ pub struct Cabinet {
     pub id: Uuid,
     pub owner_id: Uuid,
     pub name: String,
+
+    pub access_key: Option<String>,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+pub struct CabinetMember {
+    pub cabinet_id: Uuid,
+    pub user_id: Uuid,
+    pub user_username: String,
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
 pub struct CabinetProduct {
     pub cabinet_id: Uuid,
     pub product_id: Uuid,
+    pub owner_id: Uuid,
 
     pub name: String,
     pub img: String,

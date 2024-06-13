@@ -213,6 +213,7 @@ CREATE TABLE cabinets (
 CREATE TABLE shared_cabinets (
     cabinet_id SERIAL NOT NULL,
     user_id SERIAL NOT NULL,
+    user_username TEXT UNIQUE NOT NULL,
 
     FOREIGN KEY (cabinet_id) REFERENCES cabinets (id),
     FOREIGN KEY (user_id) REFERENCES users (id),
@@ -223,6 +224,7 @@ CREATE TABLE shared_cabinets (
 CREATE TABLE cabinet_products (
     cabinet_id SERIAL NOT NULL,
     product_id SERIAL NOT NULL,
+    owner_id SERIAL NOT NULL,
 
     name TEXT NOT NULL,
     img TEXT NOT NULL,
