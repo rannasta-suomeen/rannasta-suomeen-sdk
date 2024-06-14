@@ -1105,6 +1105,11 @@ pub async fn delete_cabinet(
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+    sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
     Ok(())
 }
 
