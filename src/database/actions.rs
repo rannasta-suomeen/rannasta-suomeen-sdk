@@ -223,6 +223,7 @@ pub async fn create_recipe(
         "
         INSERT INTO drink_recipes (type, author_id, name, recipe_id)
         VALUES ($1, $2, $3, $4)
+        RETURNING id
     ",
     )
     .bind(category)
@@ -234,6 +235,16 @@ pub async fn create_recipe(
     .map_err(|e| QueryError::from(e).into())?;
 
     Ok(id.0)
+}
+
+pub async fn find_recipe(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
+    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM drink_recipes WHERE LOWER(name) = LOWER($1)")
+        .bind(name)
+        .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|r| r.0))
 }
 
 pub async fn get_recipe(id: i32, pool: &Pool<Postgres>) -> Result<Option<Recipe>, potion::Error> {
@@ -529,6 +540,16 @@ pub async fn create_incredient(
     .map_err(|e| QueryError::from(e).into())?;
 
     Ok(result.0)
+}
+
+pub async fn find_incredient(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
+    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM drink_incredients WHERE LOWER(name) = LOWER($1)")
+        .bind(name)
+        .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|r| r.0))
 }
 
 pub async fn get_incredient(
