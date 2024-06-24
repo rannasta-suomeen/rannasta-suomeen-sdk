@@ -24,7 +24,7 @@ pub enum ProductType {
     Common,
     Mixer,
     Grocery,
-    Generated
+    Generated,
 }
 
 impl TryFrom<Value> for ProductType {
