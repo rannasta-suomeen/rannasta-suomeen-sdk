@@ -2,6 +2,7 @@ mod database {
     pub mod actions;
     pub mod error;
     pub mod schema;
+    pub mod srs;
 }
 mod authentication {
     pub mod cryptography;
@@ -14,3 +15,4 @@ mod constants;
 pub use authentication::*;
 pub use constants::*;
 pub use database::*;
+pub use srs::*;

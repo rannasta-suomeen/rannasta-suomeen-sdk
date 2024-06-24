@@ -1,5 +1,7 @@
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS drink_recipes CASCADE;
+DROP TABLE IF EXISTS recipe_tags CASCADE;
+DROP TABLE IF EXISTS recipe_tags_map CASCADE;
 DROP TABLE IF EXISTS drink_incredients CASCADE;
 DROP TABLE IF EXISTS recipes CASCADE;
 DROP TABLE IF EXISTS recipe_parts CASCADE;
@@ -21,7 +23,7 @@ DROP TYPE IF EXISTS retailer CASCADE;
 
 
 CREATE TYPE user_type AS ENUM ('user', 'creator', 'admin');
-CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_product', 'common', 'mixer', 'grocery' );
+CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_product', 'common', 'mixer', 'grocery', 'generated');
 CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch' );
 CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'kpl' );
 CREATE TYPE retailer AS ENUM ('superalko', 'alko');
@@ -41,6 +43,10 @@ CREATE TABLE recipes (
     id SERIAL PRIMARY KEY NOT NULL
 );
 
+CREATE TABLE recipe_tags (
+    id SERIAL PRIMARY KEY NOT NULL,
+    name TEXT UNIQUE NOT NULL
+);
 
 CREATE TABLE drink_recipes (
     id SERIAL PRIMARY KEY NOT NULL,
@@ -76,11 +82,20 @@ CREATE TABLE drink_recipes (
     incredient_count INTEGER NOT NULL DEFAULT 0,
     favorite_count INTEGER NOT NULL DEFAULT 0,
 
-    available_superlalko BOOLEAN NOT NULL DEFAULT false,
+    available_superalko BOOLEAN NOT NULL DEFAULT false,
     available_alko BOOLEAN NOT NULL DEFAULT false,
 
     FOREIGN KEY (author_id) REFERENCES users (id),
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
+);
+
+CREATE TABLE recipe_tags_map(
+    recipe_id SERIAL NOT NULL,
+    tag_id SERIAL NOT NULL,
+
+    FOREIGN KEY (recipe_id) REFERENCES drink_recipes (id),
+    FOREIGN KEY (tag_id) REFERENCES recipe_tags (id),
+    PRIMARY KEY (recipe_id, tag_id)
 );
 
 CREATE TABLE drink_incredients (
@@ -213,6 +228,7 @@ CREATE TABLE cabinets (
 CREATE TABLE shared_cabinets (
     cabinet_id SERIAL NOT NULL,
     user_id SERIAL NOT NULL,
+    user_username TEXT UNIQUE NOT NULL,
 
     FOREIGN KEY (cabinet_id) REFERENCES cabinets (id),
     FOREIGN KEY (user_id) REFERENCES users (id),
@@ -223,6 +239,7 @@ CREATE TABLE shared_cabinets (
 CREATE TABLE cabinet_products (
     cabinet_id SERIAL NOT NULL,
     product_id SERIAL NOT NULL,
+    owner_id SERIAL NOT NULL,
 
     name TEXT NOT NULL,
     img TEXT NOT NULL,
