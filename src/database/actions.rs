@@ -5,7 +5,6 @@ use crate::{
         cryptography::verify_password, jwt::generate_jwt_session, permissions::ActionType,
     }, schema::{Cabinet, CabinetProduct},
 };
-
 use super::{
     error::QueryError,
     schema::{
@@ -30,7 +29,7 @@ pub async fn get_user(
 ) -> Result<Option<User>, potion::Error> {
     let row: Option<User> = sqlx::query_as("SELECT * FROM users WHERE username = $1")
         .bind(username)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -52,7 +51,7 @@ pub async fn register_user(
     )
     .bind(username)
     .bind(password)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -84,7 +83,7 @@ pub async fn login_user(
 
 pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {
     let rows: Vec<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes;")
-        .fetch_all(&*pool)
+        .fetch_all(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -132,14 +131,14 @@ pub async fn fetch_recipes(
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         None => {
             sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.name ILIKE $1 {availability} ORDER BY {order} LIMIT $2 OFFSET $3"))
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
     };
 
@@ -222,7 +221,7 @@ pub async fn create_recipe(
 pub async fn get_recipe(id: i32, pool: &Pool<Postgres>) -> Result<Option<Recipe>, potion::Error> {
     let row: Option<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes WHERE id = $1")
         .bind(id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -264,7 +263,7 @@ pub async fn update_recipe_info(
         .bind(category)
         .bind(info)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -293,7 +292,7 @@ pub async fn add_to_recipe(
     .bind(amount)
     .bind(amount_ml)
     .bind(unit)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -314,7 +313,7 @@ pub async fn remove_from_recipe(
     )
     .bind(recipe_id)
     .bind(incredient_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -376,7 +375,7 @@ pub async fn calculate_recipe_cached_data(
         ) e1;
     ")
     .bind(recipe_id)
-    .fetch_optional(&*pool).await.map_err(|e| QueryError::from(e).into())?;
+    .fetch_optional(pool).await.map_err(|e| QueryError::from(e).into())?;
 
     match data {
         Some(data) => Ok(data),
@@ -433,7 +432,7 @@ pub async fn update_recipe_cached_data(
     .bind(data.available_alko)
     .bind(data.available_superalko)
     .bind(recipe_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -442,7 +441,7 @@ pub async fn update_recipe_cached_data(
 
 pub async fn list_incredients(pool: &Pool<Postgres>) -> Result<Vec<Incredient>, potion::Error> {
     let rows: Vec<Incredient> = sqlx::query_as("SELECT * FROM drink_incredients;")
-        .fetch_all(&*pool)
+        .fetch_all(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -520,7 +519,7 @@ pub async fn get_incredient(
 ) -> Result<Option<Incredient>, potion::Error> {
     let row: Option<Incredient> = sqlx::query_as("SELECT * FROM drink_incredients WHERE id = $1")
         .bind(id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -559,7 +558,7 @@ pub async fn get_product_filter_noname_all(
         SELECT * FROM incredient_product_filters
     ",
     )
-    .fetch_all(&*pool)
+    .fetch_all(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
     let mut hashmap: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
@@ -585,7 +584,7 @@ pub async fn get_product_filter(
     ",
     )
     .bind(incredient_id)
-    .fetch_all(&*pool)
+    .fetch_all(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -602,7 +601,7 @@ pub async fn update_incredient_info(
         .bind(name)
         .bind(category)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -635,7 +634,7 @@ pub async fn update_incredient_price(
     .bind(avg)
     .bind(max)
     .bind(id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -652,7 +651,7 @@ pub async fn update_incredient_product_category(
         .bind(category)
         .bind(use_static_filter)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -667,7 +666,7 @@ pub async fn set_product_category(
     sqlx::query("UPDATE drink_incredients SET static_filter = $1 WHERE id = $2")
         .bind(subcategory)
         .bind(id)
-        .execute(&*pool)
+        .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -692,7 +691,7 @@ pub async fn insert_product_filter(
 
         query_builder
             .build()
-            .execute(&*pool)
+            .execute(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
@@ -712,7 +711,7 @@ pub async fn remove_product_filter(
     )
     .bind(product_id)
     .bind(id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -755,7 +754,7 @@ pub async fn calculate_incredient_cached_data(
             ",
         )
         .bind(subcategory_id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?,
         None => sqlx::query_as(
@@ -784,7 +783,7 @@ pub async fn calculate_incredient_cached_data(
             ",
         )
         .bind(incredient_id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?,
     };
@@ -834,7 +833,7 @@ pub async fn update_incredient_cached_data(
     .bind(data.alko_product_count)
     .bind(data.superalko_product_count)
     .bind(incredient_id)
-    .execute(&*pool)
+    .execute(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -847,7 +846,7 @@ pub async fn get_product(
 ) -> Result<Option<Product>, potion::Error> {
     let product: Option<Product> = sqlx::query_as("SELECT * FROM products WHERE id = $1")
         .bind(id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -858,7 +857,7 @@ pub async fn get_product_categories(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<Category>, potion::Error> {
     let rows: Vec<Category> = sqlx::query_as("SELECT * FROM categories")
-        .fetch_all(&*pool)
+        .fetch_all(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
@@ -955,7 +954,7 @@ pub async fn fetch_products(
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (None, None) => {
             sqlx::query_as("
@@ -964,7 +963,7 @@ pub async fn fetch_products(
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
                 .bind(offset)
-                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         }
     };
 
@@ -986,7 +985,7 @@ pub async fn is_favorite(
     )
     .bind(id)
     .bind(user_id)
-    .fetch_optional(&*pool)
+    .fetch_optional(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;
 
@@ -1119,7 +1118,7 @@ pub async fn get_cabinet(
 ) -> Result<Option<Cabinet>, potion::Error> {
     let cabinet: Option<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE id = $1")
         .bind(id)
-        .fetch_optional(&*pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
