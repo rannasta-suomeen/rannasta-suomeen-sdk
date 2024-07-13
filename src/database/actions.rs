@@ -5,7 +5,7 @@ use crate::{
         cryptography::verify_password, jwt::generate_jwt_session, permissions::ActionType,
     },
     cryptography::generate_access_token,
-    schema::{Cabinet, CabinetMember, CabinetProduct},
+    schema::{Cabinet, CabinetMember, CabinetProduct, LinkedRecipeTag, RecipeRow, RecipeTag},
 };
 
 use super::{
@@ -21,7 +21,7 @@ use crate::{
     schema::{
         IncredientCacheData, IncredientFilterObjectNoName, IncredientOrder, IncredientRow,
         IngredientFilterList, IngredientsForDrink, Product, ProductRow, RecipeAvailability,
-        RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid,
+        RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRowPartial, Uuid,
     },
     INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
 };
@@ -142,7 +142,7 @@ pub async fn fetch_recipes(
         })
         .unwrap_or("name");
 
-    let rows: Vec<RecipeRow> = match category {
+    let rows: Vec<RecipeRowPartial> = match category {
         Some(category)=> {
             sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
                 .bind(category)
@@ -159,6 +159,9 @@ pub async fn fetch_recipes(
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
     };
+
+    let rows: Vec<RecipeRow> = rows.into_iter().map(|row| RecipeRow::from(row)).collect();
+    
 
     let total_count = *&rows.get(0).map(|p| p.count).unwrap_or(0);
     let page = PageContext::from_rows(rows, total_count, RECIPE_COUNT_PER_PAGE, offset);
@@ -377,9 +380,9 @@ pub async fn calculate_recipe_cached_data(
             SUM(e1.superalko_price_max) AS superalko_price_max,
             (SUM(e1.superalko_price_average) + SUM(e1.superalko_price_min)) / 2 AS superalko_price_average,
 
-            (SUM(e1.ethanol_min) / SUM(e1.volume)) * 100 AS abv_min,
-            ( ( (SUM(e1.ethanol_min) / SUM(e1.volume) ) + ( SUM(e1.ethanol_max) / SUM(e1.volume) ) ) / 2) * 100 AS abv_average,
-            (SUM(e1.ethanol_max) / SUM(e1.volume)) * 100 AS abv_max
+            (SUM(e1.ethanol_min) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1)) * 100 AS abv_min,
+            ( ( (SUM(e1.ethanol_min) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1 )) + ( SUM(e1.ethanol_max) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1) ) ) / 2) * 100 AS abv_average,
+            (SUM(e1.ethanol_max) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1)) * 100 AS abv_max
         FROM (
             SELECT rp.recipe_id AS id,
                 rp.amount_standard AS volume,
@@ -1038,8 +1041,8 @@ pub async fn fetch_favorites(
     user_id: i32,
     offset: i64,
     pool: &Pool<Postgres>,
-) -> Result<PageContext<RecipeRow>, potion::Error> {
-    let rows: Vec<RecipeRow> = sqlx::query_as("
+) -> Result<PageContext<RecipeRowPartial>, potion::Error> {
+    let rows: Vec<RecipeRowPartial> = sqlx::query_as("
         SELECT r.*, COUNT(rr) OVER() FROM user_favorites f LEFT JOIN drink_recipes r ON r.id = f.drink_id LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE f.user_id = $1 LIMIT $2 OFFSET $3
     ")
         .bind(user_id)
@@ -1417,17 +1420,101 @@ pub async fn add_user_to_cabinet(
     Ok(())
 }
 
-/*
-CREATE TABLE cabinet_products (
-    cabinet_id SERIAL NOT NULL,
-    product_id SERIAL NOT NULL,
+pub async fn get_tag(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Option<RecipeTag>, potion::Error> {
+    let list: Option<RecipeTag> =
+        sqlx::query_as("SELECT * FROM recipe_tags WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
 
-    product_name TEXT UNIQUE NOT NULL,
-    product_img TEXT UNIQUE NOT NULL,
-    product_href TEXT UNIQUE NOT NULL,
+    Ok(list)
+}
 
-    amount_ml INT NULL DEFAULT NULL,
+pub async fn list_tags(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<RecipeTag>, potion::Error> {
+    let list: Vec<RecipeTag> =
+        sqlx::query_as("SELECT * FROM recipe_tags")
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
 
-    PRIMARY KEY (cabinet_id, product_id)
-);
-*/
+    Ok(list)
+}
+
+pub async fn list_recipe_tags(
+    pool: &Pool<Postgres>,
+    recipe_id: i32,
+) -> Result<Vec<LinkedRecipeTag>, potion::Error> {
+    let list: Vec<LinkedRecipeTag> =
+        sqlx::query_as("SELECT * FROM recipe_tags_map WHERE recipe_id = $1")
+            .bind(recipe_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn add_tag_to_recipe(
+    recipe_id: i32,
+    tag_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+        let tag = get_tag(tag_id, pool).await?;
+        if tag.is_none() {
+            return Err(HtmlError::InvalidRequest.new("Tag doesn't exists"));
+        }
+        let tag = tag.unwrap();
+
+        sqlx::query("INSERT INTO recipe_tags_map (recipe_id, tag_id, tag_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *")
+            .bind(recipe_id)
+            .bind(tag_id)
+            .bind(tag.name)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+        
+        update_recipe_tag_list(recipe_id, pool).await?;
+
+    Ok(())
+}
+
+pub async fn remove_tag_from_recipe(
+    recipe_id: i32,
+    tag_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+        sqlx::query("DELETE FROM recipe_tags_map WHERE recipe_id = $1 AND tag_id = $2")
+            .bind(recipe_id)
+            .bind(tag_id)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+        update_recipe_tag_list(recipe_id, pool).await?;
+
+    Ok(())
+}
+
+pub async fn update_recipe_tag_list(
+    recipe_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+        let tags = list_recipe_tags(pool, recipe_id).await?;
+        let tag_list = tags.iter().map(|tag| tag.tag_name.to_owned()).collect::<Vec<String>>().join("|");
+
+        sqlx::query("UPDATE drink_recipes SET tag_list = $2 WHERE recipe_id = $1")
+            .bind(recipe_id)
+            .bind(tag_list)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
