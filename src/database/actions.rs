@@ -161,7 +161,6 @@ pub async fn fetch_recipes(
     };
 
     let rows: Vec<RecipeRow> = rows.into_iter().map(|row| RecipeRow::from(row)).collect();
-    
 
     let total_count = *&rows.get(0).map(|p| p.count).unwrap_or(0);
     let page = PageContext::from_rows(rows, total_count, RECIPE_COUNT_PER_PAGE, offset);
@@ -241,11 +240,12 @@ pub async fn create_recipe(
 }
 
 pub async fn find_recipe(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
-    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM drink_recipes WHERE LOWER(name) = LOWER($1)")
-        .bind(name)
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?;
+    let row: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM drink_recipes WHERE LOWER(name) = LOWER($1)")
+            .bind(name)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
 
     Ok(row.map(|r| r.0))
 }
@@ -545,12 +545,16 @@ pub async fn create_incredient(
     Ok(result.0)
 }
 
-pub async fn find_incredient(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
-    let row: Option<(i32,)> = sqlx::query_as("SELECT id FROM drink_incredients WHERE LOWER(name) = LOWER($1)")
-        .bind(name)
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?;
+pub async fn find_incredient(
+    name: &str,
+    pool: &Pool<Postgres>,
+) -> Result<Option<i32>, potion::Error> {
+    let row: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM drink_incredients WHERE LOWER(name) = LOWER($1)")
+            .bind(name)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
 
     Ok(row.map(|r| r.0))
 }
@@ -1420,28 +1424,21 @@ pub async fn add_user_to_cabinet(
     Ok(())
 }
 
-pub async fn get_tag(
-    id: i32,
-    pool: &Pool<Postgres>,
-) -> Result<Option<RecipeTag>, potion::Error> {
-    let list: Option<RecipeTag> =
-        sqlx::query_as("SELECT * FROM recipe_tags WHERE id = $1")
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+pub async fn get_tag(id: i32, pool: &Pool<Postgres>) -> Result<Option<RecipeTag>, potion::Error> {
+    let list: Option<RecipeTag> = sqlx::query_as("SELECT * FROM recipe_tags WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
 
     Ok(list)
 }
 
-pub async fn list_tags(
-    pool: &Pool<Postgres>,
-) -> Result<Vec<RecipeTag>, potion::Error> {
-    let list: Vec<RecipeTag> =
-        sqlx::query_as("SELECT * FROM recipe_tags")
-            .fetch_all(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+pub async fn list_tags(pool: &Pool<Postgres>) -> Result<Vec<RecipeTag>, potion::Error> {
+    let list: Vec<RecipeTag> = sqlx::query_as("SELECT * FROM recipe_tags")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
 
     Ok(list)
 }
@@ -1465,13 +1462,13 @@ pub async fn add_tag_to_recipe(
     tag_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-        let tag = get_tag(tag_id, pool).await?;
-        if tag.is_none() {
-            return Err(HtmlError::InvalidRequest.new("Tag doesn't exists"));
-        }
-        let tag = tag.unwrap();
+    let tag = get_tag(tag_id, pool).await?;
+    if tag.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Tag doesn't exists"));
+    }
+    let tag = tag.unwrap();
 
-        sqlx::query("INSERT INTO recipe_tags_map (recipe_id, tag_id, tag_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *")
+    sqlx::query("INSERT INTO recipe_tags_map (recipe_id, tag_id, tag_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *")
             .bind(recipe_id)
             .bind(tag_id)
             .bind(tag.name)
@@ -1479,8 +1476,7 @@ pub async fn add_tag_to_recipe(
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
-        
-        update_recipe_tag_list(recipe_id, pool).await?;
+    update_recipe_tag_list(recipe_id, pool).await?;
 
     Ok(())
 }
@@ -1490,14 +1486,14 @@ pub async fn remove_tag_from_recipe(
     tag_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-        sqlx::query("DELETE FROM recipe_tags_map WHERE recipe_id = $1 AND tag_id = $2")
-            .bind(recipe_id)
-            .bind(tag_id)
-            .execute(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+    sqlx::query("DELETE FROM recipe_tags_map WHERE recipe_id = $1 AND tag_id = $2")
+        .bind(recipe_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
 
-        update_recipe_tag_list(recipe_id, pool).await?;
+    update_recipe_tag_list(recipe_id, pool).await?;
 
     Ok(())
 }
@@ -1506,15 +1502,19 @@ pub async fn update_recipe_tag_list(
     recipe_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-        let tags = list_recipe_tags(pool, recipe_id).await?;
-        let tag_list = tags.iter().map(|tag| tag.tag_name.to_owned()).collect::<Vec<String>>().join("|");
+    let tags = list_recipe_tags(pool, recipe_id).await?;
+    let tag_list = tags
+        .iter()
+        .map(|tag| tag.tag_name.to_owned())
+        .collect::<Vec<String>>()
+        .join("|");
 
-        sqlx::query("UPDATE drink_recipes SET tag_list = $2 WHERE recipe_id = $1")
-            .bind(recipe_id)
-            .bind(tag_list)
-            .execute(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+    sqlx::query("UPDATE drink_recipes SET tag_list = $2 WHERE recipe_id = $1")
+        .bind(recipe_id)
+        .bind(tag_list)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
 
     Ok(())
 }
