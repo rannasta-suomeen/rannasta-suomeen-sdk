@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use crate::{
     authentication::{
         cryptography::verify_password, jwt::generate_jwt_session, permissions::ActionType,
-    }, schema::{Cabinet, CabinetProduct},
+    },
+    cryptography::generate_access_token,
+    schema::{Cabinet, CabinetMember, CabinetProduct, LinkedRecipeTag, RecipeRow, RecipeTag},
 };
 
 use super::{
@@ -17,7 +19,9 @@ use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     jwt::SessionData,
     schema::{
-        IncredientCacheData, IncredientFilterObjectNoName, IncredientOrder, IncredientRow, IngredientFilterList, IngredientsForDrink, Product, ProductRow, RecipeAvailability, RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRow, Uuid
+        IncredientCacheData, IncredientFilterObjectNoName, IncredientOrder, IncredientRow,
+        IngredientFilterList, IngredientsForDrink, Product, ProductRow, RecipeAvailability,
+        RecipeCacheData, RecipeOrder, RecipePartNoId, RecipeRowPartial, Uuid,
     },
     INCREDIENT_COUNT_PER_PAGE, RECIPE_COUNT_PER_PAGE,
 };
@@ -30,6 +34,19 @@ pub async fn get_user(
 ) -> Result<Option<User>, potion::Error> {
     let row: Option<User> = sqlx::query_as("SELECT * FROM users WHERE username = $1")
         .bind(username)
+        .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row)
+}
+
+pub async fn get_user_by_id(
+    pool: &Pool<Postgres>,
+    user_id: i32,
+) -> Result<Option<User>, potion::Error> {
+    let row: Option<User> = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
         .fetch_optional(&*pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
@@ -125,7 +142,7 @@ pub async fn fetch_recipes(
         })
         .unwrap_or("name");
 
-    let rows: Vec<RecipeRow> = match category {
+    let rows: Vec<RecipeRowPartial> = match category {
         Some(category)=> {
             sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
                 .bind(category)
@@ -142,6 +159,8 @@ pub async fn fetch_recipes(
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
     };
+
+    let rows: Vec<RecipeRow> = rows.into_iter().map(|row| RecipeRow::from(row)).collect();
 
     let total_count = *&rows.get(0).map(|p| p.count).unwrap_or(0);
     let page = PageContext::from_rows(rows, total_count, RECIPE_COUNT_PER_PAGE, offset);
@@ -206,6 +225,7 @@ pub async fn create_recipe(
         "
         INSERT INTO drink_recipes (type, author_id, name, recipe_id)
         VALUES ($1, $2, $3, $4)
+        RETURNING id
     ",
     )
     .bind(category)
@@ -217,6 +237,17 @@ pub async fn create_recipe(
     .map_err(|e| QueryError::from(e).into())?;
 
     Ok(id.0)
+}
+
+pub async fn find_recipe(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
+    let row: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM drink_recipes WHERE LOWER(name) = LOWER($1)")
+            .bind(name)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|r| r.0))
 }
 
 pub async fn get_recipe(id: i32, pool: &Pool<Postgres>) -> Result<Option<Recipe>, potion::Error> {
@@ -349,9 +380,9 @@ pub async fn calculate_recipe_cached_data(
             SUM(e1.superalko_price_max) AS superalko_price_max,
             (SUM(e1.superalko_price_average) + SUM(e1.superalko_price_min)) / 2 AS superalko_price_average,
 
-            (SUM(e1.ethanol_min) / SUM(e1.volume)) * 100 AS abv_min,
-            ( ( (SUM(e1.ethanol_min) / SUM(e1.volume) ) + ( SUM(e1.ethanol_max) / SUM(e1.volume) ) ) / 2) * 100 AS abv_average,
-            (SUM(e1.ethanol_max) / SUM(e1.volume)) * 100 AS abv_max
+            (SUM(e1.ethanol_min) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1)) * 100 AS abv_min,
+            ( ( (SUM(e1.ethanol_min) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1 )) + ( SUM(e1.ethanol_max) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1) ) ) / 2) * 100 AS abv_average,
+            (SUM(e1.ethanol_max) / COALESCE (NULLIF ( SUM(e1.volume), 0), 1)) * 100 AS abv_max
         FROM (
             SELECT rp.recipe_id AS id,
                 rp.amount_standard AS volume,
@@ -514,6 +545,20 @@ pub async fn create_incredient(
     Ok(result.0)
 }
 
+pub async fn find_incredient(
+    name: &str,
+    pool: &Pool<Postgres>,
+) -> Result<Option<i32>, potion::Error> {
+    let row: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM drink_incredients WHERE LOWER(name) = LOWER($1)")
+            .bind(name)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|r| r.0))
+}
+
 pub async fn get_incredient(
     id: i32,
     pool: &Pool<Postgres>,
@@ -563,12 +608,20 @@ pub async fn get_product_filter_noname_all(
     .await
     .map_err(|e| QueryError::from(e).into())?;
     let mut hashmap: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
-    rows.into_iter().for_each(|x| match hashmap.get_mut(&x.incredient_id) {
-        Some(v) => v.push(x.product_id),
-        None => {
-            hashmap.insert(x.incredient_id, vec![x.product_id]);}
-    });
-    let res = hashmap.into_iter().map(|(k, v)| IngredientFilterList{ ingredient_id: k, product_ids: v }).collect();
+    rows.into_iter()
+        .for_each(|x| match hashmap.get_mut(&x.incredient_id) {
+            Some(v) => v.push(x.product_id),
+            None => {
+                hashmap.insert(x.incredient_id, vec![x.product_id]);
+            }
+        });
+    let res = hashmap
+        .into_iter()
+        .map(|(k, v)| IngredientFilterList {
+            ingredient_id: k,
+            product_ids: v,
+        })
+        .collect();
     Ok(res)
 }
 
@@ -841,10 +894,7 @@ pub async fn update_incredient_cached_data(
     Ok(())
 }
 
-pub async fn get_product(
-    id: i32,
-    pool: &Pool<Postgres>,
-) -> Result<Option<Product>, potion::Error> {
+pub async fn get_product(id: i32, pool: &Pool<Postgres>) -> Result<Option<Product>, potion::Error> {
     let product: Option<Product> = sqlx::query_as("SELECT * FROM products WHERE id = $1")
         .bind(id)
         .fetch_optional(&*pool)
@@ -854,9 +904,7 @@ pub async fn get_product(
     Ok(product)
 }
 
-pub async fn get_product_categories(
-    pool: &Pool<Postgres>,
-) -> Result<Vec<Category>, potion::Error> {
+pub async fn get_product_categories(pool: &Pool<Postgres>) -> Result<Vec<Category>, potion::Error> {
     let rows: Vec<Category> = sqlx::query_as("SELECT * FROM categories")
         .fetch_all(&*pool)
         .await
@@ -905,15 +953,15 @@ pub async fn get_product_subcategory(
     Ok(rows)
 }
 
-pub async fn fetch_all_products(
-    pool: &Pool<Postgres>,
-) -> Result<Vec<Product>, potion::Error> {
-    let rows: Vec<Product> =
-            sqlx::query_as("
+pub async fn fetch_all_products(pool: &Pool<Postgres>) -> Result<Vec<Product>, potion::Error> {
+    let rows: Vec<Product> = sqlx::query_as(
+        "
                             SELECT * FROM products
-                        ")
-                            .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
-    ;
+                        ",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)
 }
@@ -997,8 +1045,8 @@ pub async fn fetch_favorites(
     user_id: i32,
     offset: i64,
     pool: &Pool<Postgres>,
-) -> Result<PageContext<RecipeRow>, potion::Error> {
-    let rows: Vec<RecipeRow> = sqlx::query_as("
+) -> Result<PageContext<RecipeRowPartial>, potion::Error> {
+    let rows: Vec<RecipeRowPartial> = sqlx::query_as("
         SELECT r.*, COUNT(rr) OVER() FROM user_favorites f LEFT JOIN drink_recipes r ON r.id = f.drink_id LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE f.user_id = $1 LIMIT $2 OFFSET $3
     ")
         .bind(user_id)
@@ -1071,12 +1119,13 @@ pub async fn create_cabinet(
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
-    let id: (i32,) = sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING *")
-        .bind(user_id)
-        .bind(name)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?;
+    let id: (i32,) =
+        sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING *")
+            .bind(user_id)
+            .bind(name)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
 
     Ok(id.0)
 }
@@ -1096,10 +1145,7 @@ pub async fn list_own_cabinets(
 
 /// Deletes a cabinet with a given id.
 /// ATTENTION: DOES NOT CHECK FOR OWNERWHIP BY ITSELF
-pub async fn delete_cabinet(
-    id: i32,
-    pool: &Pool<Postgres>,
-) -> Result<(), potion::Error> {
+pub async fn delete_cabinet(id: i32, pool: &Pool<Postgres>) -> Result<(), potion::Error> {
     sqlx::query("DELETE FROM cabinets WHERE id = $1")
         .bind(id)
         .execute(pool)
@@ -1108,12 +1154,22 @@ pub async fn delete_cabinet(
     Ok(())
 }
 
-pub async fn get_cabinet(
-    id: i32,
-    pool: &Pool<Postgres>,
-) -> Result<Option<Cabinet>, potion::Error> {
+pub async fn get_cabinet(id: i32, pool: &Pool<Postgres>) -> Result<Option<Cabinet>, potion::Error> {
     let cabinet: Option<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE id = $1")
         .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(cabinet)
+}
+
+pub async fn get_cabinet_by_token(
+    token: &str,
+    pool: &Pool<Postgres>,
+) -> Result<Option<Cabinet>, potion::Error> {
+    let cabinet: Option<Cabinet> = sqlx::query_as("SELECT * FROM cabinets WHERE access_key = $1")
+        .bind(token)
         .fetch_optional(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
@@ -1135,7 +1191,15 @@ pub async fn get_cabinet_mut(
             Ok(_) => Ok(cabinet),
             Err(_) => {
                 if cabinet.owner_id != session.user_id {
-                    Err(HtmlError::Unauthorized.default())
+                    if list_cabinet_access_list(id, &pool)
+                        .await?
+                        .iter()
+                        .any(|member| member.user_id == session.user_id)
+                    {
+                        Ok(cabinet)
+                    } else {
+                        Err(HtmlError::Unauthorized.default())
+                    }
                 } else {
                     Ok(cabinet)
                 }
@@ -1159,24 +1223,41 @@ pub async fn list_cabinet_products(
     Ok(list)
 }
 
+pub async fn list_cabinet_access_list(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Vec<CabinetMember>, potion::Error> {
+    let list: Vec<CabinetMember> =
+        sqlx::query_as("SELECT * FROM shared_cabinets WHERE cabinet_id = $1")
+            .bind(id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
 pub async fn modify_in_cabinet(
     id: i32,
     product_id: i32,
     amount_ml: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND product_id = $3")
-        .bind(amount_ml)
-        .bind(id)
-        .bind(product_id)
-        .execute(pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?;
-        Ok(())
+    sqlx::query(
+        "UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND product_id = $3",
+    )
+    .bind(amount_ml)
+    .bind(id)
+    .bind(product_id)
+    .execute(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+    Ok(())
 }
 
 pub async fn add_to_cabinet(
     id: i32,
+    user_id: i32,
     product_id: i32,
     amount_ml: Option<i32>,
     pool: &Pool<Postgres>,
@@ -1188,12 +1269,13 @@ pub async fn add_to_cabinet(
     let product = product.unwrap();
 
     let result = sqlx::query(
-        "INSERT INTO cabinet_products (cabinet_id, product_id, name, img, href, abv, amount_ml)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "INSERT INTO cabinet_products (cabinet_id, product_id, owner_id, name, img, href, abv, amount_ml)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT DO NOTHING RETURNING *",
     )
     .bind(id)
     .bind(product.id)
+    .bind(user_id)
     .bind(product.name)
     .bind(product.img)
     .bind(product.href)
@@ -1283,17 +1365,156 @@ pub async fn set_cabinet_name(
     Ok(())
 }
 
-/*
-CREATE TABLE cabinet_products (
-    cabinet_id SERIAL NOT NULL,
-    product_id SERIAL NOT NULL,
+pub async fn set_product_amount(
+    id: i32,
+    product_id: i32,
+    amount: Option<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query(
+        "UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND product_id = $3",
+    )
+    .bind(amount)
+    .bind(id)
+    .bind(product_id)
+    .execute(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
 
-    product_name TEXT UNIQUE NOT NULL,
-    product_img TEXT UNIQUE NOT NULL,
-    product_href TEXT UNIQUE NOT NULL,
+    Ok(())
+}
 
-    amount_ml INT NULL DEFAULT NULL,
+pub async fn generate_cabinet_access_token(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let token = generate_access_token();
+    dbg!(&token);
 
-    PRIMARY KEY (cabinet_id, product_id)
-);
-*/
+    sqlx::query("UPDATE cabinets SET access_key = $1 WHERE id = $2")
+        .bind(token)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
+pub async fn add_user_to_cabinet(
+    id: i32,
+    user_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let user = get_user_by_id(pool, user_id).await?;
+    if user.is_none() {
+        return Err(HtmlError::InvalidRequest.new("User doesn't exists"));
+    }
+
+    sqlx::query(
+        "INSERT INTO shared_cabinets (cabinet_id, user_id, user_username) VALUES ($1, $2, $3)",
+    )
+    .bind(id)
+    .bind(user_id)
+    .bind(user.unwrap().username)
+    .execute(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
+pub async fn get_tag(id: i32, pool: &Pool<Postgres>) -> Result<Option<RecipeTag>, potion::Error> {
+    let list: Option<RecipeTag> = sqlx::query_as("SELECT * FROM recipe_tags WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn list_tags(pool: &Pool<Postgres>) -> Result<Vec<RecipeTag>, potion::Error> {
+    let list: Vec<RecipeTag> = sqlx::query_as("SELECT * FROM recipe_tags")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn list_recipe_tags(
+    pool: &Pool<Postgres>,
+    recipe_id: i32,
+) -> Result<Vec<LinkedRecipeTag>, potion::Error> {
+    let list: Vec<LinkedRecipeTag> =
+        sqlx::query_as("SELECT * FROM recipe_tags_map WHERE recipe_id = $1")
+            .bind(recipe_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn add_tag_to_recipe(
+    recipe_id: i32,
+    tag_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let tag = get_tag(tag_id, pool).await?;
+    if tag.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Tag doesn't exists"));
+    }
+    let tag = tag.unwrap();
+
+    sqlx::query("INSERT INTO recipe_tags_map (recipe_id, tag_id, tag_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *")
+            .bind(recipe_id)
+            .bind(tag_id)
+            .bind(tag.name)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    update_recipe_tag_list(recipe_id, pool).await?;
+
+    Ok(())
+}
+
+pub async fn remove_tag_from_recipe(
+    recipe_id: i32,
+    tag_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("DELETE FROM recipe_tags_map WHERE recipe_id = $1 AND tag_id = $2")
+        .bind(recipe_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    update_recipe_tag_list(recipe_id, pool).await?;
+
+    Ok(())
+}
+
+pub async fn update_recipe_tag_list(
+    recipe_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let tags = list_recipe_tags(pool, recipe_id).await?;
+    let tag_list = tags
+        .iter()
+        .map(|tag| tag.tag_name.to_owned())
+        .collect::<Vec<String>>()
+        .join("|");
+
+    sqlx::query("UPDATE drink_recipes SET tag_list = $2 WHERE recipe_id = $1")
+        .bind(recipe_id)
+        .bind(tag_list)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
