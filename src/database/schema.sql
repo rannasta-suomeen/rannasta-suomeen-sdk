@@ -31,7 +31,7 @@ DROP TYPE IF EXISTS retailer CASCADE;
 CREATE TYPE user_type AS ENUM ('user', 'creator', 'admin');
 CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_product', 'common', 'mixer', 'grocery', 'generated');
 CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch', 'generated' );
-CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'kpl' );
+CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'tl', 'dash', 'kpl' );
 CREATE TYPE retailer AS ENUM ('superalko', 'alko');
 
 /* Users */
