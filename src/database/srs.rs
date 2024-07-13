@@ -5,21 +5,17 @@ use serde_json::Value;
 
 use crate::schema::UnitType;
 
-
-
-
-
 #[derive(Debug, Clone)]
 pub struct StandardRecipeSyntax {
     pub name: String,
-    pub parts: Vec<StandardRecipePart>
+    pub parts: Vec<StandardRecipePart>,
 }
 
 #[derive(Debug, Clone)]
 pub struct StandardRecipePart {
     pub amount: i32,
     pub unit: UnitType,
-    pub incredient_name: String
+    pub incredient_name: String,
 }
 
 impl TryFrom<String> for StandardRecipeSyntax {
@@ -41,7 +37,7 @@ impl TryFrom<String> for StandardRecipeSyntax {
             incredient_name: String::new(),
         };
 
-        for part in data.iter(){
+        for part in data.iter() {
             match i {
                 1 => {
                     let amount = part.parse::<i32>().ok();
@@ -50,7 +46,7 @@ impl TryFrom<String> for StandardRecipeSyntax {
                     }
 
                     tmp.amount = amount.unwrap();
-                },
+                }
                 2 => {
                     let value = Value::String(String::from(*part));
                     let unit = UnitType::try_from(value).ok();
@@ -59,7 +55,7 @@ impl TryFrom<String> for StandardRecipeSyntax {
                     }
 
                     tmp.unit = unit.unwrap();
-                },
+                }
                 3 => {
                     tmp.incredient_name = String::from(*part);
 
@@ -72,16 +68,16 @@ impl TryFrom<String> for StandardRecipeSyntax {
                     };
 
                     i = 0;
-                },
-                _ => unreachable!()
+                }
+                _ => unreachable!(),
             }
 
             i += 1;
-        }   
+        }
 
         Ok(Self {
             name: name.to_string(),
-            parts
+            parts,
         })
     }
 }

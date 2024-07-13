@@ -24,7 +24,7 @@ pub enum ProductType {
     Common,
     Mixer,
     Grocery,
-    Generated
+    Generated,
 }
 
 impl TryFrom<Value> for ProductType {
@@ -413,12 +413,14 @@ pub struct Recipe {
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
-pub struct RecipeRow {
+pub struct RecipeRowPartial {
     pub id: Uuid,
     pub r#type: RecipeType,
 
     pub author_id: Uuid,
     pub name: String,
+
+    pub tag_list: String,
 
     pub total_volume: f64,
     pub standard_servings: f64,
@@ -447,6 +449,77 @@ pub struct RecipeRow {
     pub available_alko: bool,
 
     pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecipeRow {
+    pub id: Uuid,
+    pub r#type: RecipeType,
+
+    pub author_id: Uuid,
+    pub name: String,
+
+    pub tag_list: Vec<String>,
+
+    pub total_volume: f64,
+    pub standard_servings: f64,
+    pub alko_price_per_serving: f64,
+    pub superalko_price_per_serving: f64,
+
+    pub alko_aer: f64,
+    pub superalko_aer: f64,
+
+    pub abv_average: f64,
+    pub abv_max: f64,
+    pub abv_min: f64,
+
+    pub alko_price_max: f64,
+    pub alko_price_min: f64,
+    pub alko_price_average: f64,
+
+    pub superalko_price_max: f64,
+    pub superalko_price_min: f64,
+    pub superalko_price_average: f64,
+
+    pub incredient_count: i32,
+    pub favorite_count: i32,
+
+    pub available_superalko: bool,
+    pub available_alko: bool,
+
+    pub count: i64,
+}
+
+impl From<RecipeRowPartial> for RecipeRow {
+    fn from(value: RecipeRowPartial) -> Self {
+        Self {
+            id: value.id,
+            r#type: value.r#type,
+            author_id: value.author_id,
+            name: value.name,
+            tag_list: value.tag_list.split("|").map(|s| s.to_owned()).collect(),
+            total_volume: value.total_volume,
+            standard_servings: value.standard_servings,
+            alko_price_per_serving: value.alko_price_per_serving,
+            superalko_price_per_serving: value.superalko_price_per_serving,
+            alko_aer: value.alko_aer,
+            superalko_aer: value.superalko_aer,
+            abv_average: value.abv_average,
+            abv_max: value.abv_max,
+            abv_min: value.abv_min,
+            alko_price_max: value.alko_price_max,
+            alko_price_min: value.alko_price_min,
+            alko_price_average: value.alko_price_average,
+            superalko_price_max: value.superalko_price_max,
+            superalko_price_min: value.superalko_price_min,
+            superalko_price_average: value.superalko_price_average,
+            incredient_count: value.incredient_count,
+            favorite_count: value.favorite_count,
+            available_superalko: value.available_superalko,
+            available_alko: value.available_alko,
+            count: value.count,
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
@@ -542,4 +615,17 @@ pub struct CabinetProduct {
 
     pub amount_ml: Option<i32>,
     pub usable: bool,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, PartialEq, PartialOrd)]
+pub struct RecipeTag {
+    pub id: Uuid,
+    pub name: String,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, PartialEq, PartialOrd)]
+pub struct LinkedRecipeTag {
+    pub recipe_id: Uuid,
+    pub tag_id: Uuid,
+    pub tag_name: String,
 }

@@ -12,6 +12,12 @@ DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS user_incredients CASCADE;
 DROP TABLE IF EXISTS user_favorites CASCADE;
 
+DROP TABLE IF EXISTS recipe_tags CASCADE;
+DROP TABLE IF EXISTS recipe_tags CASCADE;
+DROP TABLE IF EXISTS cabinets CASCADE;
+DROP TABLE IF EXISTS shared_cabinets CASCADE;
+DROP TABLE IF EXISTS cabinet_products CASCADE;
+
 DROP TABLE IF EXISTS incredient_product_filters CASCADE;
 
 DROP TYPE IF EXISTS user_type CASCADE;
@@ -24,7 +30,7 @@ DROP TYPE IF EXISTS retailer CASCADE;
 
 CREATE TYPE user_type AS ENUM ('user', 'creator', 'admin');
 CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_product', 'common', 'mixer', 'grocery', 'generated');
-CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch' );
+CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch', 'generated' );
 CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'kpl' );
 CREATE TYPE retailer AS ENUM ('superalko', 'alko');
 
@@ -55,6 +61,8 @@ CREATE TABLE drink_recipes (
     author_id INTEGER NOT NULL,
     name TEXT UNIQUE NOT NULL,
     info TEXT NOT NULL DEFAULT '',
+
+    tag_list TEXT NOT NULL DEFAULT '',
 
     recipe_id SERIAL NOT NULL,
 
@@ -92,6 +100,7 @@ CREATE TABLE drink_recipes (
 CREATE TABLE recipe_tags_map(
     recipe_id SERIAL NOT NULL,
     tag_id SERIAL NOT NULL,
+    tag_name TEXT NOT NULL,
 
     FOREIGN KEY (recipe_id) REFERENCES drink_recipes (id),
     FOREIGN KEY (tag_id) REFERENCES recipe_tags (id),
