@@ -358,6 +358,8 @@ pub struct ProductRow {
     pub name: String,
     pub href: String,
     pub img: String,
+    pub retailer: Retailer,
+    pub unit_price: f64,
 
     pub count: i64,
 }
