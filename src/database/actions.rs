@@ -804,7 +804,7 @@ pub async fn calculate_incredient_cached_data(
                 FROM products p
                 LEFT JOIN products ap ON (ap.id = p.id AND ap.retailer = 'alko')
                 LEFT JOIN products sap ON (sap.id = p.id AND sap.retailer = 'superalko')
-                WHERE p.subcategory_id = 14 AND p.abv > 0;
+                WHERE p.subcategory_id = $1 AND p.abv > 0;
             ",
         )
         .bind(subcategory_id)
@@ -832,7 +832,7 @@ pub async fn calculate_incredient_cached_data(
                 LEFT JOIN products p ON p.id = product_id
                 LEFT JOIN products ap ON (ap.id = product_id AND ap.retailer = 'alko')
                 LEFT JOIN products sap ON (sap.id = product_id AND sap.retailer = 'superalko')
-                WHERE incredient_id = 49
+                WHERE incredient_id = $1
                 GROUP BY f.incredient_id
             ",
         )
