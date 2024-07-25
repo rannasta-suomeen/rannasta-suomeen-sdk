@@ -403,7 +403,7 @@ pub async fn calculate_recipe_cached_data(
             FROM recipe_parts rp
             INNER JOIN drink_incredients d ON d.id = rp.incredient_id
             WHERE rp.recipe_id = $1
-            GROUP BY (rp.recipe_id, rp.amount_standard, d.alko_product_count, d.superalko_product_count, d.abv_min, d.alko_price_min, d.superalko_price_min, d.abv_max, d.alko_price_max, d.superalko_price_max, d.alko_price_average, d.superalko_price_average)
+            GROUP BY (rp.recipe_id, d.id, rp.amount_standard, d.alko_product_count, d.superalko_product_count, d.abv_min, d.alko_price_min, d.superalko_price_min, d.abv_max, d.alko_price_max, d.superalko_price_max, d.alko_price_average, d.superalko_price_average)
         ) e1;
     ")
     .bind(recipe_id)
@@ -804,7 +804,7 @@ pub async fn calculate_incredient_cached_data(
                 FROM products p
                 LEFT JOIN products ap ON (ap.id = p.id AND ap.retailer = 'alko')
                 LEFT JOIN products sap ON (sap.id = p.id AND sap.retailer = 'superalko')
-                WHERE p.subcategory_id = $1
+                WHERE p.subcategory_id = 14 AND p.abv > 0;
             ",
         )
         .bind(subcategory_id)
@@ -832,7 +832,7 @@ pub async fn calculate_incredient_cached_data(
                 LEFT JOIN products p ON p.id = product_id
                 LEFT JOIN products ap ON (ap.id = product_id AND ap.retailer = 'alko')
                 LEFT JOIN products sap ON (sap.id = product_id AND sap.retailer = 'superalko')
-                WHERE incredient_id = $1
+                WHERE incredient_id = 49
                 GROUP BY f.incredient_id
             ",
         )
@@ -976,7 +976,7 @@ pub async fn fetch_products(
     let rows: Vec<ProductRow> = match (category_id, sub_category) {
         (Some(category_id), Some(subcategory_id)) => {
             sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 LIMIT $4 OFFSET $5
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 LIMIT $4 OFFSET $5
             ")
                 .bind(category_id)
                 .bind(subcategory_id)
@@ -987,7 +987,7 @@ pub async fn fetch_products(
         },
         (Some(category_id), None) => {
             sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
             ")
                 .bind(category_id)
                 .bind(search)
@@ -997,7 +997,7 @@ pub async fn fetch_products(
         },
         (None, Some(subcategory_id)) => {
             sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
             ")
                 .bind(subcategory_id)
                 .bind(search)
@@ -1007,7 +1007,7 @@ pub async fn fetch_products(
         },
         (None, None) => {
             sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 LIMIT $2 OFFSET $3
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 LIMIT $2 OFFSET $3
             ")
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
@@ -1424,6 +1424,20 @@ pub async fn add_user_to_cabinet(
     Ok(())
 }
 
+pub async fn create_tag(
+    name: &str,
+    pool: &Pool<Postgres>,
+) -> Result<i32, potion::Error> {
+
+    let id: (i32,) = sqlx::query_as("INSERT INTO recipe_tags (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *")
+            .bind(name)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(id.0)
+}
+
 pub async fn get_tag(id: i32, pool: &Pool<Postgres>) -> Result<Option<RecipeTag>, potion::Error> {
     let list: Option<RecipeTag> = sqlx::query_as("SELECT * FROM recipe_tags WHERE id = $1")
         .bind(id)
@@ -1432,6 +1446,16 @@ pub async fn get_tag(id: i32, pool: &Pool<Postgres>) -> Result<Option<RecipeTag>
         .map_err(|e| QueryError::from(e).into())?;
 
     Ok(list)
+}
+
+pub async fn find_tag(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
+    let list: Option<(i32,)> = sqlx::query_as("SELECT id FROM recipe_tags WHERE name = $1")
+        .bind(name)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list.map(|tag| tag.0))
 }
 
 pub async fn list_tags(pool: &Pool<Postgres>) -> Result<Vec<RecipeTag>, potion::Error> {

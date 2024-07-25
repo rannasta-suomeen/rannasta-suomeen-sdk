@@ -52,6 +52,7 @@ pub enum RecipeType {
     Cocktail,
     Shot,
     Punch,
+    Generated
 }
 
 impl TryFrom<Value> for RecipeType {
@@ -78,6 +79,8 @@ pub enum UnitType {
     Ml,
     Oz,
     Kpl,
+    Tl,
+    Dash
 }
 
 impl TryFrom<Value> for UnitType {
@@ -90,6 +93,8 @@ impl TryFrom<Value> for UnitType {
                 "ml" => Ok(Self::Ml),
                 "oz" => Ok(Self::Oz),
                 "kpl" => Ok(Self::Kpl),
+                "tl" => Ok(Self::Tl),
+                "dash" => Ok(Self::Dash),
                 _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),
@@ -117,6 +122,26 @@ impl UnitType {
             (UnitType::Kpl, UnitType::Ml) => (other, 0.),
             (UnitType::Kpl, UnitType::Oz) => (other, 0.),
             (UnitType::Kpl, UnitType::Kpl) => (other, value),
+            (UnitType::Cl, UnitType::Tl) => (other, value * 0.676280454),
+            (UnitType::Cl, UnitType::Dash) => (other, value * (0.625 / 10.)),
+            (UnitType::Ml, UnitType::Tl) => (other, value * 0.0676280454),
+            (UnitType::Ml, UnitType::Dash) => (other, value * 0.625),
+            (UnitType::Oz, UnitType::Tl) => (other, value * 2.),
+            (UnitType::Oz, UnitType::Dash) => (other, value * 29.5735296 * 0.625),
+            (UnitType::Kpl, UnitType::Tl) => (other, 0.),
+            (UnitType::Kpl, UnitType::Dash) => (other, 0.),
+            (UnitType::Tl, UnitType::Cl) => (other, 0.),
+            (UnitType::Tl, UnitType::Ml) => (other, 0.),
+            (UnitType::Tl, UnitType::Oz) => (other, 0.),
+            (UnitType::Tl, UnitType::Kpl) => (other, 0.),
+            (UnitType::Tl, UnitType::Tl) => (other, value),
+            (UnitType::Tl, UnitType::Dash) => (other, value * 0.),
+            (UnitType::Dash, UnitType::Cl) => (other, value * 0.3080575996094 * 10.),
+            (UnitType::Dash, UnitType::Ml) => (other, value * 0.3080575996094),
+            (UnitType::Dash, UnitType::Oz) => (other, value * 0.01084211177902),
+            (UnitType::Dash, UnitType::Kpl) => (other, 0.),
+            (UnitType::Dash, UnitType::Tl) => (other, value * 0.02053717330729),
+            (UnitType::Dash, UnitType::Dash) => (other, value),
         }
     }
 }
@@ -333,6 +358,8 @@ pub struct ProductRow {
     pub name: String,
     pub href: String,
     pub img: String,
+    pub retailer: Retailer,
+    pub unit_price: f64,
 
     pub count: i64,
 }
