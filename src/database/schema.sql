@@ -290,6 +290,7 @@ CREATE OR REPLACE FUNCTION incredient_update_notify() RETURNS trigger AS $$
 DECLARE
     pid int;
     list varchar[];
+    list_static varchar[];
 BEGIN
     IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
         pid = NEW.id;
@@ -298,8 +299,9 @@ BEGIN
     END IF;
 
     list = ARRAY(SELECT f.incredient_id FROM products p INNER JOIN incredient_product_filters f ON f.product_id = p.id WHERE p.id = pid);
+    list_static = ARRAY(SELECT d.id FROM products p INNER JOIN drink_incredients d ON d.use_static_filter AND d.static_filter = p.subcategory_id WHERE p.id = pid);
     
-    PERFORM pg_notify('incredient_update', json_build_object('table', TG_TABLE_NAME, 'id', pid, 'list', list, 'action_type', TG_OP)::text);
+    PERFORM pg_notify('incredient_update', json_build_object('table', TG_TABLE_NAME, 'id', pid, 'list', list, 'list_static', list_static, 'action_type', TG_OP)::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

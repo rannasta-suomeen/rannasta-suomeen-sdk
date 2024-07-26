@@ -114,6 +114,7 @@ pub async fn fetch_recipes(
     availability: Option<RecipeAvailability>,
     offset: i64,
     search: String,
+    author: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<PageContext<RecipeRow>, potion::Error> {
     let availability = availability
@@ -142,17 +143,34 @@ pub async fn fetch_recipes(
         })
         .unwrap_or("name");
 
-    let rows: Vec<RecipeRowPartial> = match category {
-        Some(category)=> {
-            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+    let rows: Vec<RecipeRowPartial> = match (category, author) {
+        (Some(category), Some(author)) => {
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.author_id = $2 AND r.name ILIKE $3 {availability} ORDER BY {order} LIMIT $4 OFFSET $5"))
                 .bind(category)
+                .bind(author)
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
-        None => {
+        (None, Some(author)) => {
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.author_id = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(author)
+                .bind(search)
+                .bind(RECIPE_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (None, None) => {
             sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.name ILIKE $1 {availability} ORDER BY {order} LIMIT $2 OFFSET $3"))
+                .bind(search)
+                .bind(RECIPE_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (Some(category), None) => {
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(category)
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
@@ -485,6 +503,7 @@ pub async fn fetch_incredients(
     order: Option<IncredientOrder>,
     offset: i64,
     search: String,
+    author: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<PageContext<IncredientRow>, potion::Error> {
     let order = order
@@ -499,17 +518,34 @@ pub async fn fetch_incredients(
         })
         .unwrap_or("name");
 
-    let rows: Vec<IncredientRow> = match category {
-        Some(category)=> {
-            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.type = $1 AND d.name ILIKE $2 ORDER BY {order} LIMIT $3 OFFSET $4"))
+    let rows: Vec<IncredientRow> = match (category, author) {
+        (Some(category), Some(author)) => {
+            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.type = $1 AND d.author_id = $2 AND d.name ILIKE $3 ORDER BY {order} LIMIT $4 OFFSET $5"))
                 .bind(category)
+                .bind(author)
                 .bind(search)
                 .bind(INCREDIENT_COUNT_PER_PAGE)
                 .bind(offset)
                 .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
-        None => {
+        (None, Some(author)) => {
+            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.author_id = $1 AND d.name ILIKE $2 ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(author)
+                .bind(search)
+                .bind(INCREDIENT_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (None, None) => {
             sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.name ILIKE $1 ORDER BY {order} LIMIT $2 OFFSET $3"))
+                .bind(search)
+                .bind(INCREDIENT_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (Some(category), None) => {
+            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.type = $1 AND d.name ILIKE $2 ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(category)
                 .bind(search)
                 .bind(INCREDIENT_COUNT_PER_PAGE)
                 .bind(offset)
