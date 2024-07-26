@@ -173,7 +173,7 @@ CREATE TABLE products (
     id SERIAL NOT NULL PRIMARY KEY,
 
     name TEXT NOT NULL,
-    href TEXT NOT NULL,
+    href UNIQUE TEXT NOT NULL,
     price FLOAT NOT NULL,
     img TEXT NOT NULL,
     volume FLOAT NOT NULL,

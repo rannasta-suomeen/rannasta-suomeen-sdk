@@ -99,13 +99,13 @@ pub async fn login_user(
     Ok(session)
 }
 
-pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {
-    let rows: Vec<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes;")
+pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<RecipeRow>, potion::Error> {
+    let rows: Vec<RecipeRowPartial> = sqlx::query_as("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id;")
         .fetch_all(&*pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
-    Ok(rows)
+    Ok(rows.into_iter().map(|x| x.into()).collect())
 }
 
 pub async fn fetch_recipes(
