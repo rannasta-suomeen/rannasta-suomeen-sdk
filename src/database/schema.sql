@@ -173,7 +173,7 @@ CREATE TABLE products (
     id SERIAL NOT NULL PRIMARY KEY,
 
     name TEXT NOT NULL,
-    href TEXT NOT NULL,
+    href UNIQUE TEXT NOT NULL,
     price FLOAT NOT NULL,
     img TEXT NOT NULL,
     volume FLOAT NOT NULL,
@@ -181,7 +181,7 @@ CREATE TABLE products (
     subcategory_id SERIAL NOT NULL,
 
     abv FLOAT NOT NULL,
-    aer FLOAT GENERATED ALWAYS AS (volume*abv*10/price) STORED,
+    aer FLOAT GENERATED ALWAYS AS (volume*abv/price) STORED,
 
     unit_price FLOAT GENERATED ALWAYS AS (price/volume) STORED,
     retailer retailer NOT NULL,
@@ -290,6 +290,7 @@ CREATE OR REPLACE FUNCTION incredient_update_notify() RETURNS trigger AS $$
 DECLARE
     pid int;
     list varchar[];
+    list_static varchar[];
 BEGIN
     IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
         pid = NEW.id;
@@ -298,8 +299,9 @@ BEGIN
     END IF;
 
     list = ARRAY(SELECT f.incredient_id FROM products p INNER JOIN incredient_product_filters f ON f.product_id = p.id WHERE p.id = pid);
+    list_static = ARRAY(SELECT d.id FROM products p INNER JOIN drink_incredients d ON d.use_static_filter AND d.static_filter = p.subcategory_id WHERE p.id = pid);
     
-    PERFORM pg_notify('incredient_update', json_build_object('table', TG_TABLE_NAME, 'id', pid, 'list', list, 'action_type', TG_OP)::text);
+    PERFORM pg_notify('incredient_update', json_build_object('table', TG_TABLE_NAME, 'id', pid, 'list', list, 'list_static', list_static, 'action_type', TG_OP)::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

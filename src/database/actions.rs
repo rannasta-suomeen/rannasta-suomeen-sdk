@@ -11,8 +11,7 @@ use crate::{
 use super::{
     error::QueryError,
     schema::{
-        Category, Incredient, IncredientFilterObject, ProductType, Recipe, RecipePart, RecipeType,
-        SubCategory, UnitType, User,
+        Category, Incredient, IncredientFilterObject, ProductOrder, ProductType, Recipe, RecipePart, RecipeType, SubCategory, UnitType, User
     },
 };
 use crate::{
@@ -114,6 +113,7 @@ pub async fn fetch_recipes(
     availability: Option<RecipeAvailability>,
     offset: i64,
     search: String,
+    author: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<PageContext<RecipeRow>, potion::Error> {
     let availability = availability
@@ -142,17 +142,34 @@ pub async fn fetch_recipes(
         })
         .unwrap_or("name");
 
-    let rows: Vec<RecipeRowPartial> = match category {
-        Some(category)=> {
-            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+    let rows: Vec<RecipeRowPartial> = match (category, author) {
+        (Some(category), Some(author)) => {
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.author_id = $2 AND r.name ILIKE $3 {availability} ORDER BY {order} LIMIT $4 OFFSET $5"))
                 .bind(category)
+                .bind(author)
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
-        None => {
+        (None, Some(author)) => {
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.author_id = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(author)
+                .bind(search)
+                .bind(RECIPE_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (None, None) => {
             sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.name ILIKE $1 {availability} ORDER BY {order} LIMIT $2 OFFSET $3"))
+                .bind(search)
+                .bind(RECIPE_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (Some(category), None) => {
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(category)
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
@@ -485,6 +502,7 @@ pub async fn fetch_incredients(
     order: Option<IncredientOrder>,
     offset: i64,
     search: String,
+    author: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<PageContext<IncredientRow>, potion::Error> {
     let order = order
@@ -499,17 +517,34 @@ pub async fn fetch_incredients(
         })
         .unwrap_or("name");
 
-    let rows: Vec<IncredientRow> = match category {
-        Some(category)=> {
-            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.type = $1 AND d.name ILIKE $2 ORDER BY {order} LIMIT $3 OFFSET $4"))
+    let rows: Vec<IncredientRow> = match (category, author) {
+        (Some(category), Some(author)) => {
+            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.type = $1 AND d.author_id = $2 AND d.name ILIKE $3 ORDER BY {order} LIMIT $4 OFFSET $5"))
                 .bind(category)
+                .bind(author)
                 .bind(search)
                 .bind(INCREDIENT_COUNT_PER_PAGE)
                 .bind(offset)
                 .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
-        None => {
+        (None, Some(author)) => {
+            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.author_id = $1 AND d.name ILIKE $2 ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(author)
+                .bind(search)
+                .bind(INCREDIENT_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (None, None) => {
             sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.name ILIKE $1 ORDER BY {order} LIMIT $2 OFFSET $3"))
+                .bind(search)
+                .bind(INCREDIENT_COUNT_PER_PAGE)
+                .bind(offset)
+                .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
+        },
+        (Some(category), None) => {
+            sqlx::query_as(&format!("SELECT d.*, COUNT(dd) OVER() FROM drink_incredients d LEFT JOIN drink_incredients dd ON dd.id = d.id WHERE d.type = $1 AND d.name ILIKE $2 ORDER BY {order} LIMIT $3 OFFSET $4"))
+                .bind(category)
                 .bind(search)
                 .bind(INCREDIENT_COUNT_PER_PAGE)
                 .bind(offset)
@@ -927,6 +962,18 @@ pub async fn get_product_subcategories(
     Ok(rows)
 }
 
+pub async fn list_product_subcategories(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<SubCategory>, potion::Error> {
+    let rows: Vec<SubCategory> =
+        sqlx::query_as("SELECT * FROM subcategories")
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(rows)
+}
+
 pub async fn get_product_category(
     category_id: i32,
     pool: &Pool<Postgres>,
@@ -970,14 +1017,37 @@ pub async fn fetch_products(
     search: String,
     category_id: Option<i32>,
     sub_category: Option<i32>,
+    order: Option<ProductOrder>,
+    availability: Option<RecipeAvailability>,
     offset: i64,
     pool: &Pool<Postgres>,
 ) -> Result<PageContext<ProductRow>, potion::Error> {
+
+    let order = order
+    .map(|order| match order {
+        ProductOrder::Alphabetical => "name",
+        ProductOrder::PriceAsc => "p.price ASC",
+        ProductOrder::PriceDesc => "p.price DESC",
+        ProductOrder::UnitPriceAsc => "p.unit_price ASC",
+        ProductOrder::UnitPriceDesc => "p.unit_price DESC",
+        ProductOrder::AerAsc => "p.aer ASC",
+        ProductOrder::AerDesc => "p.aer DESC",
+    })
+    .unwrap_or("name");
+
+    let availability = availability
+    .map(|availability| match availability {
+        RecipeAvailability::Any => "",
+        RecipeAvailability::Alko => "AND p.retailer = 'alko'",
+        RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
+    })
+    .unwrap_or("");
+
     let rows: Vec<ProductRow> = match (category_id, sub_category) {
         (Some(category_id), Some(subcategory_id)) => {
-            sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 LIMIT $4 OFFSET $5
-            ")
+            sqlx::query_as(&format!("
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 {} ORDER BY {} LIMIT $4 OFFSET $5
+            ", availability, order))
                 .bind(category_id)
                 .bind(subcategory_id)
                 .bind(search)
@@ -986,9 +1056,9 @@ pub async fn fetch_products(
                 .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (Some(category_id), None) => {
-            sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
-            ")
+            sqlx::query_as(&format!("
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 {} ORDER BY {} LIMIT $3 OFFSET $4
+            ", availability, order))
                 .bind(category_id)
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
@@ -996,9 +1066,9 @@ pub async fn fetch_products(
                 .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (None, Some(subcategory_id)) => {
-            sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 LIMIT $3 OFFSET $4
-            ")
+            sqlx::query_as(&format!("
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 {} ORDER BY {} LIMIT $3 OFFSET $4
+            ", availability, order))
                 .bind(subcategory_id)
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
@@ -1006,9 +1076,9 @@ pub async fn fetch_products(
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (None, None) => {
-            sqlx::query_as("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 LIMIT $2 OFFSET $3
-            ")
+            sqlx::query_as(&format!("
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 {} ORDER BY {} LIMIT $2 OFFSET $3
+            ", availability, order))
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)
                 .bind(offset)

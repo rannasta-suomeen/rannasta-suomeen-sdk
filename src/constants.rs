@@ -26,7 +26,7 @@ pub const INCREDIENT_ORDERS: &[(&str, &str)] = &[
 ];
 
 pub const RECIPE_ORDERS: &[(&str, &str)] = &[
-    ("alphabetical", "Nimi"),
+    ("alphabetical", "Name"),
     ("abv_asc", "ABV (asc)"),
     ("abv_desc", "ABV (desc)"),
     ("volume_asc", "Volume (asc)"),
@@ -41,10 +41,26 @@ pub const RECIPE_ORDERS: &[(&str, &str)] = &[
     ("price_alko_desc", "Price Alko (desc)"),
 ];
 
+pub const PRODUCT_ORDERS: &[(&str, &str)] = &[
+    ("alphabetical", "Name"),
+    ("price_asc", "Price (asc)"),
+    ("price_desc", "Price (desc)"),
+    ("unit_price_asc", "Unit Price (asc)"),
+    ("unit_price_desc", "Unit Price (desc)"),
+    ("aer_asc", "Aer (asc)"),
+    ("aer_desc", "Aer (desc)"),
+];
+
 pub const RECIPE_AVAILABILITIES: &[(&str, &str)] = &[
     ("any", "Any"),
     ("alko", "Available in Alko"),
     ("superalko", "Available in Superalko"),
+];
+
+pub const PRODUCT_AVAILABILITIES: &[(&str, &str)] = &[
+    ("any", "Either"),
+    ("alko", "Alko"),
+    ("superalko", "Superalko"),
 ];
 
 pub const UNITS: &[&str] = &["cl", "ml", "oz", "kpl"];

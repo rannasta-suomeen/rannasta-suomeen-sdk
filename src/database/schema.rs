@@ -258,6 +258,39 @@ impl TryFrom<Value> for RecipeAvailability {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[sqlx(type_name = "drink_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum ProductOrder {
+    Alphabetical,
+    PriceAsc,
+    PriceDesc,
+    UnitPriceAsc,
+    UnitPriceDesc,
+    AerAsc,
+    AerDesc,
+}
+
+impl TryFrom<Value> for ProductOrder {
+    type Error = TypeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            Some(value) => match value {
+                "alphabetical" => Ok(Self::Alphabetical),
+                "price_asc" => Ok(Self::PriceAsc),
+                "price_desc" => Ok(Self::PriceDesc),
+                "unit_price_asc" => Ok(Self::UnitPriceAsc),
+                "unit_price_desc" => Ok(Self::UnitPriceDesc),
+                "aer_asc" => Ok(Self::AerAsc),
+                "aer_desc" => Ok(Self::AerDesc),
+                _ => Err(TypeError::new("Invalid variant")),
+            },
+            None => return Err(TypeError::new("Failed to parse value as string")),
+        }
+    }
+}
+
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
 pub struct User {
     pub id: Uuid,
@@ -361,6 +394,10 @@ pub struct ProductRow {
     pub img: String,
     pub retailer: Retailer,
     pub unit_price: f64,
+    pub price: f64,
+    pub abv: f64,
+    pub volume: f64,
+    pub aer: f64,
 
     pub count: i64,
 }
