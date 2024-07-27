@@ -99,13 +99,13 @@ pub async fn login_user(
     Ok(session)
 }
 
-pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<RecipeRow>, potion::Error> {
-    let rows: Vec<RecipeRowPartial> = sqlx::query_as("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id;")
+pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {
+    let rows: Vec<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes")
         .fetch_all(&*pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
-    Ok(rows.into_iter().map(|x| x.into()).collect())
+    Ok(rows)
 }
 
 pub async fn fetch_recipes(
@@ -1424,16 +1424,14 @@ pub async fn add_user_to_cabinet(
     Ok(())
 }
 
-pub async fn create_tag(
-    name: &str,
-    pool: &Pool<Postgres>,
-) -> Result<i32, potion::Error> {
-
-    let id: (i32,) = sqlx::query_as("INSERT INTO recipe_tags (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *")
-            .bind(name)
-            .fetch_one(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+pub async fn create_tag(name: &str, pool: &Pool<Postgres>) -> Result<i32, potion::Error> {
+    let id: (i32,) = sqlx::query_as(
+        "INSERT INTO recipe_tags (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *",
+    )
+    .bind(name)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
 
     Ok(id.0)
 }
