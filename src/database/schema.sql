@@ -181,7 +181,7 @@ CREATE TABLE products (
     subcategory_id SERIAL NOT NULL,
 
     abv FLOAT NOT NULL,
-    aer FLOAT GENERATED ALWAYS AS (volume*abv*10/price) STORED,
+    aer FLOAT GENERATED ALWAYS AS (volume*abv/price) STORED,
 
     unit_price FLOAT GENERATED ALWAYS AS (price/volume) STORED,
     retailer retailer NOT NULL,
