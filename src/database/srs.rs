@@ -9,7 +9,7 @@ use crate::schema::UnitType;
 pub struct StandardRecipeSyntax {
     pub name: String,
     pub parts: Vec<StandardRecipePart>,
-    pub tags: Vec<String>
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,7 +82,7 @@ impl TryFrom<String> for StandardRecipeSyntax {
         Ok(Self {
             name: name.to_string(),
             parts,
-            tags: recipe_tags.iter().map(|tag| tag.to_string()).collect()
+            tags: recipe_tags.iter().map(|tag| tag.to_string()).collect(),
         })
     }
 }

@@ -1,6 +1,7 @@
 use potion::TypeError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::{postgres::PgRow, FromRow, Row};
 
 pub type Uuid = i32;
 
@@ -52,7 +53,7 @@ pub enum RecipeType {
     Cocktail,
     Shot,
     Punch,
-    Generated
+    Generated,
 }
 
 impl TryFrom<Value> for RecipeType {
@@ -80,7 +81,7 @@ pub enum UnitType {
     Oz,
     Kpl,
     Tl,
-    Dash
+    Dash,
 }
 
 impl TryFrom<Value> for UnitType {
@@ -438,7 +439,7 @@ pub struct IncredientCacheData {
     pub superalko_product_count: i64,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Recipe {
     pub id: Uuid,
     pub r#type: RecipeType,
@@ -448,6 +449,7 @@ pub struct Recipe {
     pub info: String,
 
     pub recipe_id: Uuid,
+    pub tag_list: Vec<String>,
 
     pub total_volume: f64,
     pub standard_servings: f64,
@@ -474,6 +476,44 @@ pub struct Recipe {
 
     pub available_superalko: bool,
     pub available_alko: bool,
+}
+
+impl FromRow<'_, PgRow> for Recipe {
+    fn from_row(row: &'_ PgRow) -> Result<Self, sqlx::Error> {
+        let tag_list_string: String = row.try_get("tag_list")?;
+        let tag_list: Vec<String> = tag_list_string
+            .split("|")
+            .map(|x| x.trim().to_owned())
+            .collect();
+        Ok(Recipe {
+            id: row.try_get("id")?,
+            r#type: row.try_get("type")?,
+            author_id: row.try_get("author_id")?,
+            name: row.try_get("name")?,
+            info: row.try_get("info")?,
+            recipe_id: row.try_get("recipe_id")?,
+            tag_list,
+            total_volume: row.try_get("total_volume")?,
+            standard_servings: row.try_get("standard_servings")?,
+            alko_price_per_serving: row.try_get("alko_price_per_serving")?,
+            superalko_price_per_serving: row.try_get("superalko_price_per_serving")?,
+            alko_aer: row.try_get("alko_aer")?,
+            superalko_aer: row.try_get("superalko_aer")?,
+            abv_average: row.try_get("abv_average")?,
+            abv_max: row.try_get("abv_max")?,
+            abv_min: row.try_get("abv_min")?,
+            alko_price_max: row.try_get("alko_price_max")?,
+            alko_price_min: row.try_get("alko_price_min")?,
+            alko_price_average: row.try_get("alko_price_average")?,
+            superalko_price_max: row.try_get("superalko_price_max")?,
+            superalko_price_min: row.try_get("superalko_price_min")?,
+            superalko_price_average: row.try_get("superalko_price_average")?,
+            incredient_count: row.try_get("incredient_count")?,
+            favorite_count: row.try_get("favorite_count")?,
+            available_superalko: row.try_get("available_superalko")?,
+            available_alko: row.try_get("available_alko")?,
+        })
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize)]
