@@ -484,6 +484,7 @@ impl FromRow<'_, PgRow> for Recipe {
         let tag_list: Vec<String> = tag_list_string
             .split("|")
             .map(|x| x.trim().to_owned())
+            .filter(|x| x != "")
             .collect();
         Ok(Recipe {
             id: row.try_get("id")?,
