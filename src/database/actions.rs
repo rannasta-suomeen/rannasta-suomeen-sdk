@@ -1215,11 +1215,25 @@ pub async fn list_own_cabinets(
 /// Deletes a cabinet with a given id.
 /// ATTENTION: DOES NOT CHECK FOR OWNERWHIP BY ITSELF
 pub async fn delete_cabinet(id: i32, pool: &Pool<Postgres>) -> Result<(), potion::Error> {
-    sqlx::query("DELETE FROM cabinets WHERE id = $1")
+    let mut tr = pool.begin().await.map_err(|_|QueryError::new("Could not start transaction".to_owned()).into())?;
+    sqlx::query("DELETE FROM shared_cabinets WHERE cabinet_id = $1")
         .bind(id)
-        .execute(pool)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?; 
+
+    sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM cabinets WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+    tr.commit().await.map_err(|_|QueryError::new("Could not commit transaction".to_owned()).into())?;
     Ok(())
 }
 
