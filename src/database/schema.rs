@@ -6,7 +6,7 @@ use sqlx::{postgres::PgRow, FromRow, Row};
 pub type Uuid = i32;
 
 #[derive(
-    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash, Deserialize,
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
 )]
 #[sqlx(type_name = "user_type", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
@@ -16,7 +16,7 @@ pub enum UserRole {
     Admin,
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "product_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ProductType {
@@ -46,7 +46,7 @@ impl TryFrom<Value> for ProductType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeType {
@@ -72,7 +72,7 @@ impl TryFrom<Value> for RecipeType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "unit_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum UnitType {
@@ -147,7 +147,7 @@ impl UnitType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "retailer", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum Retailer {
@@ -155,7 +155,7 @@ pub enum Retailer {
     Alko,
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum IncredientOrder {
@@ -188,7 +188,7 @@ impl TryFrom<Value> for IncredientOrder {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeOrder {
@@ -233,7 +233,7 @@ impl TryFrom<Value> for RecipeOrder {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeAvailability {
@@ -258,7 +258,7 @@ impl TryFrom<Value> for RecipeAvailability {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Eq, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ProductOrder {
@@ -291,7 +291,7 @@ impl TryFrom<Value> for ProductOrder {
     }
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -299,7 +299,7 @@ pub struct User {
     pub uid: UserRole,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct Incredient {
     pub id: Uuid,
     pub r#type: ProductType,
@@ -328,7 +328,7 @@ pub struct Incredient {
     pub static_filter: Option<i32>,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct IncredientRow {
     pub id: Uuid,
     pub r#type: ProductType,
@@ -353,13 +353,13 @@ pub struct IncredientRow {
     pub count: i64,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct Category {
     pub id: Uuid,
     pub name: String,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct SubCategory {
     pub id: Uuid,
     pub name: String,
@@ -367,7 +367,7 @@ pub struct SubCategory {
     pub product_count: i32,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
     pub id: Uuid,
     pub name: String,
@@ -386,7 +386,7 @@ pub struct Product {
     pub retailer: Retailer,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct ProductRow {
     pub id: Uuid,
     pub name: String,
@@ -402,26 +402,26 @@ pub struct ProductRow {
     pub count: i64,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct IncredientFilterObject {
     pub incredient_id: Uuid,
     pub product_id: Uuid,
     pub product_name: String,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct IncredientFilterObjectNoName {
     pub incredient_id: Uuid,
     pub product_id: Uuid,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct IngredientFilterList {
     pub ingredient_id: Uuid,
     pub product_ids: Vec<Uuid>,
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct IncredientCacheData {
     pub abv_average: f64,
     pub abv_max: f64,
@@ -439,7 +439,7 @@ pub struct IncredientCacheData {
     pub superalko_product_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
     pub id: Uuid,
     pub r#type: RecipeType,
@@ -517,7 +517,7 @@ impl FromRow<'_, PgRow> for Recipe {
     }
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RecipeRowPartial {
     pub id: Uuid,
     pub r#type: RecipeType,
@@ -556,7 +556,7 @@ pub struct RecipeRowPartial {
     pub count: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecipeRow {
     pub id: Uuid,
     pub r#type: RecipeType,
@@ -627,7 +627,7 @@ impl From<RecipeRowPartial> for RecipeRow {
     }
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RecipePart {
     pub recipe_id: Uuid,
     pub incredient_id: Uuid,
@@ -636,14 +636,14 @@ pub struct RecipePart {
     pub name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct IngredientsForDrink {
     pub recipe_id: Uuid,
     pub recipe_parts: Vec<RecipePartNoId>,
 }
 
 // PERF: Name is not a needed part, for it can be gotten elsewhere
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct RecipePartNoId {
     pub ingredient_id: Uuid,
     pub amount: i32,
@@ -662,7 +662,7 @@ impl From<RecipePart> for RecipePartNoId {
     }
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RecipeCacheData {
     pub total_volume: f64,
     pub standard_servings: f64,
@@ -691,7 +691,7 @@ pub struct RecipeCacheData {
     pub available_alko: bool,
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Cabinet {
     pub id: Uuid,
     pub owner_id: Uuid,
@@ -700,14 +700,14 @@ pub struct Cabinet {
     pub access_key: Option<String>,
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CabinetMember {
     pub cabinet_id: Uuid,
     pub user_id: Uuid,
     pub user_username: String,
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CabinetProduct {
     pub cabinet_id: Uuid,
     pub product_id: Uuid,
@@ -722,13 +722,13 @@ pub struct CabinetProduct {
     pub usable: bool,
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, PartialEq, PartialOrd)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct RecipeTag {
     pub id: Uuid,
     pub name: String,
 }
 
-#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, PartialEq, PartialOrd)]
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct LinkedRecipeTag {
     pub recipe_id: Uuid,
     pub tag_id: Uuid,
