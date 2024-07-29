@@ -16,7 +16,9 @@ pub enum UserRole {
     Admin,
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "product_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ProductType {
@@ -46,7 +48,9 @@ impl TryFrom<Value> for ProductType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeType {
@@ -72,7 +76,9 @@ impl TryFrom<Value> for RecipeType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "unit_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum UnitType {
@@ -147,7 +153,9 @@ impl UnitType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "retailer", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum Retailer {
@@ -155,7 +163,9 @@ pub enum Retailer {
     Alko,
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum IncredientOrder {
@@ -188,7 +198,9 @@ impl TryFrom<Value> for IncredientOrder {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeOrder {
@@ -233,7 +245,9 @@ impl TryFrom<Value> for RecipeOrder {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RecipeAvailability {
@@ -258,7 +272,9 @@ impl TryFrom<Value> for RecipeAvailability {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, PartialOrd, sqlx::Type, Serialize, Deserialize, Eq, Ord, Hash,
+)]
 #[sqlx(type_name = "drink_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ProductOrder {
