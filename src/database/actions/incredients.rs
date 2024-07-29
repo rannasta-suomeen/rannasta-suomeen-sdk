@@ -128,7 +128,7 @@ pub async fn delete_incredient(id: i32, pool: &Pool<Postgres>) -> Result<(), pot
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
-        sqlx::query("DELETE FROM recipe_parts WHERE incredient_id = $1")
+    sqlx::query("DELETE FROM recipe_parts WHERE incredient_id = $1")
         .bind(id)
         .execute(&mut *tr)
         .await
@@ -139,7 +139,7 @@ pub async fn delete_incredient(id: i32, pool: &Pool<Postgres>) -> Result<(), pot
         .execute(&mut *tr)
         .await
         .map_err(|e| QueryError::from(e).into())?;
-    
+
     tr.commit()
         .await
         .map_err(|_| QueryError::new("Could not commit transaction".to_owned()).into())?;

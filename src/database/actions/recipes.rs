@@ -208,7 +208,7 @@ pub async fn delete_recipe(id: i32, pool: &Pool<Postgres>) -> Result<(), potion:
         .execute(&mut *tr)
         .await
         .map_err(|e| QueryError::from(e).into())?;
-    
+
     tr.commit()
         .await
         .map_err(|_| QueryError::new("Could not commit transaction".to_owned()).into())?;
