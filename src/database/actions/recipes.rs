@@ -167,6 +167,54 @@ pub async fn create_recipe(
     Ok(id.0)
 }
 
+pub async fn delete_recipe(id: i32, pool: &Pool<Postgres>) -> Result<(), potion::Error> {
+    let recipe = get_recipe(id, &pool).await?;
+    if recipe.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Recipe doesn't exists"));
+    }
+    let recipe = recipe.unwrap();
+
+    let mut tr = pool
+        .begin()
+        .await
+        .map_err(|_| QueryError::new("Could not start transaction".to_owned()).into())?;
+
+    sqlx::query("DELETE FROM user_favorites WHERE drink_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM recipe_tags_map WHERE recipe_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM drink_recipes WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM recipe_parts WHERE recipe_id = $1")
+        .bind(recipe.recipe_id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM recipes WHERE id = $1")
+        .bind(recipe.recipe_id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    tr.commit()
+        .await
+        .map_err(|_| QueryError::new("Could not commit transaction".to_owned()).into())?;
+    Ok(())
+}
+
 pub async fn find_recipe(name: &str, pool: &Pool<Postgres>) -> Result<Option<i32>, potion::Error> {
     let row: Option<(i32,)> =
         sqlx::query_as("SELECT id FROM drink_recipes WHERE LOWER(name) = LOWER($1)")

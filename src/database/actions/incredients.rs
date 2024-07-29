@@ -110,6 +110,42 @@ pub async fn create_incredient(
     Ok(result.0)
 }
 
+pub async fn delete_incredient(id: i32, pool: &Pool<Postgres>) -> Result<(), potion::Error> {
+    let mut tr = pool
+        .begin()
+        .await
+        .map_err(|_| QueryError::new("Could not start transaction".to_owned()).into())?;
+
+    sqlx::query("DELETE FROM incredient_product_filters WHERE incredient_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM user_incredients WHERE incredient_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM recipe_parts WHERE incredient_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM drink_incredients WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    tr.commit()
+        .await
+        .map_err(|_| QueryError::new("Could not commit transaction".to_owned()).into())?;
+    Ok(())
+}
+
 pub async fn find_incredient(
     name: &str,
     pool: &Pool<Postgres>,

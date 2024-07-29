@@ -252,6 +252,7 @@ CREATE TABLE shared_cabinets (
 );
 
 CREATE TABLE cabinet_products (
+    id SERIAL NOT NULL,
     cabinet_id SERIAL NOT NULL,
     product_id SERIAL NOT NULL,
     owner_id SERIAL NOT NULL,
@@ -264,7 +265,7 @@ CREATE TABLE cabinet_products (
     usable BOOLEAN DEFAULT true,    
     amount_ml INT NULL DEFAULT NULL,
 
-    PRIMARY KEY (cabinet_id, product_id)
+    PRIMARY KEY (id, product_id, owner_id)
 );
 
 /* Caches */
@@ -278,17 +279,13 @@ CREATE TABLE global_cache (
 CREATE TABLE ingredient_cache (
     id SERIAL NOT NULL PRIMARY KEY,
     cache_key TEXT NOT NULL,
-    ingredient_id SERIAL NOT NULL,
-
-    FOREIGN KEY (ingredient_id) REFERENCES drink_incredients (id)
+    ingredient_id SERIAL NOT NULL
 );
 
 CREATE TABLE recipe_cache (
     id SERIAL NOT NULL PRIMARY KEY,
     cache_key TEXT NOT NULL,
-    recipe_id SERIAL NOT NULL,
-
-    FOREIGN KEY (recipe_id) REFERENCES drink_recipes (id)
+    recipe_id SERIAL NOT NULL
 );
 
 /* sync recipes */

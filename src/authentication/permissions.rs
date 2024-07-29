@@ -26,7 +26,9 @@ const ACTION_TABLE: &[(UserRole, &[ActionType])] = &[
             ActionType::CreateIncredients,
             ActionType::CreateRecipes,
             ActionType::ManageOwnRecipes,
+            ActionType::DeleteRecipes,
             ActionType::ManageOwnIncredients,
+            ActionType::DeleteIncredients,
             ActionType::ManageAllRecipes,
             ActionType::ManageAllIncredients,
             ActionType::ManageOwnCabinets,
@@ -43,6 +45,9 @@ pub enum ActionType {
     ManageOwnFavorites,
     ManageOwnRecipes,
     ManageOwnIncredients,
+
+    DeleteRecipes,
+    DeleteIncredients,
 
     ManageOwnCabinets,
     ManageAllCabinets,

@@ -725,6 +725,7 @@ pub struct CabinetMember {
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CabinetProduct {
+    pub id: Uuid,
     pub cabinet_id: Uuid,
     pub product_id: Uuid,
     pub owner_id: Uuid,
