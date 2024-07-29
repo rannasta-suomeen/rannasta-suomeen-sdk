@@ -10,17 +10,19 @@ use crate::authentication::jwt::{verify_jwt_session, SessionData};
 pub fn with_session() -> impl Filter<Extract = (Session,), Error = Infallible> + Copy {
     warp::cookie::optional::<String>("session").then(|session: Option<String>| async move {
         if session.is_none() {
-            return Err(potion::Error::from(
-                HtmlError::InvalidSession.redirect("Invalid session", "/users/login"),
-            ));
+            return Err(potion::Error::from(HtmlError::InvalidSession.redirect(
+                "Invalid session",
+                "/users/login?redirect_reason?invalid-session",
+            )));
         }
 
         if let Ok(data) = verify_jwt_session(session.unwrap()) {
             return Ok::<SessionData, potion::Error>(data.into());
         } else {
-            return Err(potion::Error::from(
-                HtmlError::InvalidSession.redirect("Missing session", "/users/login"),
-            ));
+            return Err(potion::Error::from(HtmlError::InvalidSession.redirect(
+                "Missing session",
+                "/users/login?redirect_reason?missing-session",
+            )));
         }
     })
 }
