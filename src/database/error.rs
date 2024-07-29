@@ -49,3 +49,31 @@ impl Into<Error> for QueryError {
         }
     }
 }
+
+pub struct CacheError {
+    info: String,
+}
+
+impl From<redis::RedisError> for CacheError {
+    fn from(value: redis::RedisError) -> Self {
+        Self {
+            info: format!("{:?} - {:?}", value.code(), value.detail()),
+        }
+    }
+}
+
+impl CacheError {
+    pub fn new(info: String) -> Self {
+        Self { info }
+    }
+}
+
+impl Into<Error> for CacheError {
+    fn into(self) -> Error {
+        Error {
+            code: 500,
+            info: Some(self.info),
+            redirect: None,
+        }
+    }
+}

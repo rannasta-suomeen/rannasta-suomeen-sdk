@@ -11,7 +11,7 @@ pub fn with_session() -> impl Filter<Extract = (Session,), Error = Infallible> +
     warp::cookie::optional::<String>("session").then(|session: Option<String>| async move {
         if session.is_none() {
             return Err(potion::Error::from(
-                HtmlError::InvalidSession.new("Invalid session"),
+                HtmlError::InvalidSession.redirect("Invalid session", "/users/login"),
             ));
         }
 
@@ -19,7 +19,7 @@ pub fn with_session() -> impl Filter<Extract = (Session,), Error = Infallible> +
             return Ok::<SessionData, potion::Error>(data.into());
         } else {
             return Err(potion::Error::from(
-                HtmlError::InvalidSession.new("Missing session"),
+                HtmlError::InvalidSession.redirect("Missing session", "/users/login"),
             ));
         }
     })

@@ -11,7 +11,8 @@ use crate::{
 use super::{
     error::QueryError,
     schema::{
-        Category, Incredient, IncredientFilterObject, ProductOrder, ProductType, Recipe, RecipePart, RecipeType, SubCategory, UnitType, User
+        Category, Incredient, IncredientFilterObject, ProductOrder, ProductType, Recipe,
+        RecipePart, RecipeType, SubCategory, UnitType, User,
     },
 };
 use crate::{
@@ -965,11 +966,10 @@ pub async fn get_product_subcategories(
 pub async fn list_product_subcategories(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<SubCategory>, potion::Error> {
-    let rows: Vec<SubCategory> =
-        sqlx::query_as("SELECT * FROM subcategories")
-            .fetch_all(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+    let rows: Vec<SubCategory> = sqlx::query_as("SELECT * FROM subcategories")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)
 }
@@ -1022,26 +1022,25 @@ pub async fn fetch_products(
     offset: i64,
     pool: &Pool<Postgres>,
 ) -> Result<PageContext<ProductRow>, potion::Error> {
-
     let order = order
-    .map(|order| match order {
-        ProductOrder::Alphabetical => "name",
-        ProductOrder::PriceAsc => "p.price ASC",
-        ProductOrder::PriceDesc => "p.price DESC",
-        ProductOrder::UnitPriceAsc => "p.unit_price ASC",
-        ProductOrder::UnitPriceDesc => "p.unit_price DESC",
-        ProductOrder::AerAsc => "p.aer ASC",
-        ProductOrder::AerDesc => "p.aer DESC",
-    })
-    .unwrap_or("name");
+        .map(|order| match order {
+            ProductOrder::Alphabetical => "name",
+            ProductOrder::PriceAsc => "p.price ASC",
+            ProductOrder::PriceDesc => "p.price DESC",
+            ProductOrder::UnitPriceAsc => "p.unit_price ASC",
+            ProductOrder::UnitPriceDesc => "p.unit_price DESC",
+            ProductOrder::AerAsc => "p.aer ASC",
+            ProductOrder::AerDesc => "p.aer DESC",
+        })
+        .unwrap_or("name");
 
     let availability = availability
-    .map(|availability| match availability {
-        RecipeAvailability::Any => "",
-        RecipeAvailability::Alko => "AND p.retailer = 'alko'",
-        RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
-    })
-    .unwrap_or("");
+        .map(|availability| match availability {
+            RecipeAvailability::Any => "",
+            RecipeAvailability::Alko => "AND p.retailer = 'alko'",
+            RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
+        })
+        .unwrap_or("");
 
     let rows: Vec<ProductRow> = match (category_id, sub_category) {
         (Some(category_id), Some(subcategory_id)) => {
@@ -1459,7 +1458,6 @@ pub async fn generate_cabinet_access_token(
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let token = generate_access_token();
-    dbg!(&token);
 
     sqlx::query("UPDATE cabinets SET access_key = $1 WHERE id = $2")
         .bind(token)
