@@ -18,6 +18,11 @@ DROP TABLE IF EXISTS cabinets CASCADE;
 DROP TABLE IF EXISTS shared_cabinets CASCADE;
 DROP TABLE IF EXISTS cabinet_products CASCADE;
 
+DROP TABLE IF EXISTS global_cache CASCADE;
+DROP TABLE IF EXISTS ingredient_cache CASCADE;
+DROP TABLE IF EXISTS recipe_cache CASCADE;
+
+
 DROP TABLE IF EXISTS incredient_product_filters CASCADE;
 
 DROP TYPE IF EXISTS user_type CASCADE;
@@ -25,6 +30,7 @@ DROP TYPE IF EXISTS product_type CASCADE;
 DROP TYPE IF EXISTS drink_type CASCADE;
 DROP TYPE IF EXISTS unit_type CASCADE;
 DROP TYPE IF EXISTS retailer CASCADE;
+
 
 
 
@@ -261,9 +267,50 @@ CREATE TABLE cabinet_products (
     PRIMARY KEY (cabinet_id, product_id)
 );
 
+/* Caches */
+CREATE TABLE global_cache (
+    id SERIAL NOT NULL PRIMARY KEY,
+    global_cache_key TEXT UNIQUE NOT NULL,
+    ingredient_cache_key TEXT UNIQUE NOT NULL,
+    recipe_cache_key TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE ingredient_cache (
+    id SERIAL NOT NULL PRIMARY KEY,
+    cache_key TEXT NOT NULL,
+    ingredient_id SERIAL NOT NULL,
+
+    FOREIGN KEY (ingredient_id) REFERENCES drink_incredients (id)
+);
+
+CREATE TABLE recipe_cache (
+    id SERIAL NOT NULL PRIMARY KEY,
+    cache_key TEXT NOT NULL,
+    recipe_id SERIAL NOT NULL,
+
+    FOREIGN KEY (recipe_id) REFERENCES drink_recipes (id)
+);
 
 /* sync recipes */
 CREATE OR REPLACE FUNCTION recipe_update_notify() RETURNS trigger AS $$
+DECLARE
+    id int;
+BEGIN
+    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+        id = NEW.id;
+    ELSE
+        id = OLD.id;
+    END IF;
+    
+    PERFORM pg_notify('recipe_update', json_build_object('table', TG_TABLE_NAME, 'id', id, 'action_type', TG_OP)::text);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS recipe_notify_update ON drink_recipes;
+CREATE TRIGGER recipe_notify_update AFTER UPDATE ON drink_recipes FOR EACH ROW EXECUTE PROCEDURE recipe_update_notify();
+
+CREATE OR REPLACE FUNCTION incredient_update_notify() RETURNS trigger AS $$
 DECLARE
     id int;
     list varchar[];
@@ -276,17 +323,17 @@ BEGIN
 
     list = ARRAY(SELECT recipe_id FROM recipe_parts WHERE incredient_id = id);
     
-    PERFORM pg_notify('recipe_update', json_build_object('table', TG_TABLE_NAME, 'id', id, 'list', list, 'action_type', TG_OP)::text);
+    PERFORM pg_notify('incredient_update', json_build_object('table', TG_TABLE_NAME, 'id', id, 'list', list, 'action_type', TG_OP)::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS recipe_notify_update ON drink_incredients;
-CREATE TRIGGER recipe_notify_update AFTER UPDATE ON drink_incredients FOR EACH ROW EXECUTE PROCEDURE recipe_update_notify();
+DROP TRIGGER IF EXISTS incredient_notify_update ON drink_incredients;
+CREATE TRIGGER incredient_notify_update AFTER UPDATE ON drink_incredients FOR EACH ROW EXECUTE PROCEDURE incredient_update_notify();
 
 
 /* sync incredients */
-CREATE OR REPLACE FUNCTION incredient_update_notify() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION product_update_notify() RETURNS trigger AS $$
 DECLARE
     pid int;
     list varchar[];
@@ -301,10 +348,10 @@ BEGIN
     list = ARRAY(SELECT f.incredient_id FROM products p INNER JOIN incredient_product_filters f ON f.product_id = p.id WHERE p.id = pid);
     list_static = ARRAY(SELECT d.id FROM products p INNER JOIN drink_incredients d ON d.use_static_filter AND d.static_filter = p.subcategory_id WHERE p.id = pid);
     
-    PERFORM pg_notify('incredient_update', json_build_object('table', TG_TABLE_NAME, 'id', pid, 'list', list, 'list_static', list_static, 'action_type', TG_OP)::text);
+    PERFORM pg_notify('product_update', json_build_object('table', TG_TABLE_NAME, 'id', pid, 'list', list, 'list_static', list_static, 'action_type', TG_OP)::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS incredient_notify_update ON products;
-CREATE TRIGGER incredient_notify_update AFTER UPDATE ON products FOR EACH ROW EXECUTE PROCEDURE incredient_update_notify();
+DROP TRIGGER IF EXISTS product_notify_update ON products;
+CREATE TRIGGER product_notify_update AFTER UPDATE ON products FOR EACH ROW EXECUTE PROCEDURE product_update_notify();
