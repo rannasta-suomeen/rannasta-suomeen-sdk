@@ -49,16 +49,14 @@ pub async fn fetch_recipes(
             RecipeOrder::Alphabetical => "name",
             RecipeOrder::AbvAsc => "abv_average",
             RecipeOrder::AbvDesc => "abv_average DESC",
-            RecipeOrder::VolumeAsc => "total_volume",
-            RecipeOrder::VolumeDesc => "total_volume DESC",
-            RecipeOrder::ServingsAsc => "standard_servings",
-            RecipeOrder::ServingsDesc => "standard_servings DESC",
-            RecipeOrder::IncredientCountAsc => "incredient_count",
-            RecipeOrder::IncredientCountDesc => "incredient_count DESC",
             RecipeOrder::PriceSuperalkoAsc => "superalko_price_min",
             RecipeOrder::PriceSuperalkoDesc => "superalko_price_max DESC",
             RecipeOrder::PriceAlkoAsc => "alko_price_min",
             RecipeOrder::PriceAlkoDesc => "alko_price_max DESC",
+            RecipeOrder::AerAlkoAsc => "alko_aer",
+            RecipeOrder::AerAlkoDesc => "alko_aer DESC",
+            RecipeOrder::AerSuperalkoAsc => "superalko_aer",
+            RecipeOrder::AerSuperalkoDesc => "superalko_aer DESC",
         })
         .unwrap_or("name");
 
@@ -136,7 +134,7 @@ pub async fn recipe_count_by_incredient(
 ) -> Result<i64, potion::Error> {
     let count: (i64,) = sqlx::query_as(
         "
-        SELECT count(r) as count
+        SELECT count(r.id) as count
         FROM recipe_parts rp
         INNER JOIN drink_recipes r ON r.recipe_id = rp.recipe_id
         WHERE rp.incredient_id = $1
