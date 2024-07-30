@@ -25,7 +25,7 @@ pub async fn create_cabinet(
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
-        add_user_to_cabinet(id.0, user_id, &pool).await?;
+    add_user_to_cabinet(id.0, user_id, &pool).await?;
 
     Ok(id.0)
 }
@@ -163,7 +163,6 @@ pub async fn list_cabinet_products(
     Ok(list)
 }
 
-
 pub async fn list_cabinet_access_list(
     id: i32,
     pool: &Pool<Postgres>,
@@ -241,8 +240,11 @@ pub async fn add_to_cabinet_bulk(
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    
-    let product_list: Vec<CabinetProduct> = fetch_cabinet_products(id_map, &pool).await?.drain(..).filter(|p| p.owner_id == user_id).collect();
+    let product_list: Vec<CabinetProduct> = fetch_cabinet_products(id_map, &pool)
+        .await?
+        .drain(..)
+        .filter(|p| p.owner_id == user_id)
+        .collect();
 
     insert_cabinet_products(cabinet_id, product_list, user_id, &pool).await?;
 
@@ -253,9 +255,8 @@ pub async fn fetch_cabinet_products(
     id_map: Vec<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<Vec<CabinetProduct>, potion::Error> {
-    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-        "SELECT * FROM cabinet_products WHERE id IN ",
-    );
+    let mut query_builder: QueryBuilder<Postgres> =
+        QueryBuilder::new("SELECT * FROM cabinet_products WHERE id IN ");
 
     query_builder.push_tuples(id_map.iter().take(65535 / 4), |mut b, id| {
         b.push_bind(id);
@@ -265,7 +266,10 @@ pub async fn fetch_cabinet_products(
         .build()
         .fetch_all(&*pool)
         .await
-        .map_err(|e| QueryError::from(e).into())?.iter().filter_map(|row| CabinetProduct::from_row(row).ok()).collect();
+        .map_err(|e| QueryError::from(e).into())?
+        .iter()
+        .filter_map(|row| CabinetProduct::from_row(row).ok())
+        .collect();
 
     Ok(list)
 }
@@ -276,7 +280,6 @@ pub async fn insert_cabinet_products(
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         "INSERT INTO cabinet_products (cabinet_id, product_id, owner_id, name, img, href, abv, amount_ml) ",
     );
@@ -300,7 +303,6 @@ pub async fn insert_cabinet_products(
 
     Ok(())
 }
-
 
 pub async fn remove_from_cabinet(
     id: i32,
