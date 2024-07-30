@@ -296,13 +296,13 @@ pub async fn update_incredient_price(
     Ok(())
 }
 
-pub async fn update_incredient_product_category(
+pub async fn update_incredient_static_filter(
     id: i32,
     category: i32,
     pool: &Pool<Postgres>,
     use_static_filter: bool,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE drink_incredients SET category = $1, use_static_filter = $2 WHERE id = $3")
+    sqlx::query("UPDATE drink_incredients SET category = $1, use_static_filter = $2, use_static_filter_c = $2, static_filter_c = $1 WHERE id = $3")
         .bind(category)
         .bind(use_static_filter)
         .bind(id)
@@ -313,13 +313,30 @@ pub async fn update_incredient_product_category(
     Ok(())
 }
 
-pub async fn set_product_category(
+pub async fn set_product_s_filter(
     id: i32,
     subcategory: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE drink_incredients SET static_filter = $1 WHERE id = $2")
+    sqlx::query("UPDATE drink_incredients SET static_filter = $1, use_static_filter = true, use_static_filter_c = false, static_filter_c = NULL WHERE id = $2")
         .bind(subcategory)
+        .bind(id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    update_incredient_cached_data(id, pool).await?;
+
+    Ok(())
+}
+
+pub async fn set_product_c_filter(
+    id: i32,
+    category: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE drink_incredients SET static_filter_c = $1, use_static_filter_c = true WHERE id = $2")
+        .bind(category)
         .bind(id)
         .execute(&*pool)
         .await
@@ -383,10 +400,16 @@ pub async fn calculate_incredient_cached_data(
     if incredient.is_none() {
         return Err(HtmlError::InvalidRequest.default().into());
     }
+    let mut incredient = incredient.unwrap();
+    if !incredient.use_static_filter {
+        incredient.static_filter = None;
+        incredient.static_filter_c = None;
+    }
 
-    let data: Option<IncredientCacheData> = match incredient.unwrap().static_filter {
-        Some(subcategory_id) => sqlx::query_as(
-            "
+    let data: Option<IncredientCacheData> =
+        match (incredient.static_filter, incredient.static_filter_c) {
+            (Some(subcategory_id), None) => sqlx::query_as(
+                "
                 SELECT 
                     COALESCE(AVG(ap.unit_price), 0) AS alko_price_average,
                     COALESCE(MAX(ap.unit_price), 0) AS alko_price_max,
@@ -407,13 +430,40 @@ pub async fn calculate_incredient_cached_data(
                 LEFT JOIN products sap ON (sap.id = p.id AND sap.retailer = 'superalko')
                 WHERE p.subcategory_id = $1 AND p.abv > 0;
             ",
-        )
-        .bind(subcategory_id)
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?,
-        None => sqlx::query_as(
-            "
+            )
+            .bind(subcategory_id)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?,
+            (None, Some(category_id)) | (Some(_), Some(category_id)) => sqlx::query_as(
+                "
+                SELECT 
+                    COALESCE(AVG(ap.unit_price), 0) AS alko_price_average,
+                    COALESCE(MAX(ap.unit_price), 0) AS alko_price_max,
+                    COALESCE(min(ap.unit_price), 0) AS alko_price_min,
+                
+                    COALESCE(AVG(sap.unit_price), 0) AS superalko_price_average,
+                    COALESCE(MAX(sap.unit_price), 0) AS superalko_price_max,
+                    COALESCE(MIN(sap.unit_price), 0) AS superalko_price_min,
+                
+                    AVG(p.abv) AS abv_average,
+                    MAX(p.abv) AS abv_max,
+                    MIN(p.abv) AS abv_min,
+                
+                    COUNT(ap) AS alko_product_count,
+                    COUNT(sap) AS superalko_product_count
+                FROM products p
+                LEFT JOIN products ap ON (ap.id = p.id AND ap.retailer = 'alko')
+                LEFT JOIN products sap ON (sap.id = p.id AND sap.retailer = 'superalko')
+                WHERE p.category_id = $1 AND p.abv > 0;
+            ",
+            )
+            .bind(category_id)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?,
+            (None, None) => sqlx::query_as(
+                "
                 SELECT 
                     COALESCE(AVG(ap.unit_price), 0) AS alko_price_average,
                     COALESCE(MAX(ap.unit_price), 0) AS alko_price_max,
@@ -436,12 +486,12 @@ pub async fn calculate_incredient_cached_data(
                 WHERE incredient_id = $1
                 GROUP BY f.incredient_id
             ",
-        )
-        .bind(incredient_id)
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?,
-    };
+            )
+            .bind(incredient_id)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?,
+        };
 
     match data {
         Some(data) => Ok(data),

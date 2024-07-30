@@ -341,7 +341,9 @@ pub struct Incredient {
     pub superalko_product_count: i32,
 
     pub use_static_filter: bool,
+    pub use_static_filter_c: bool,
     pub static_filter: Option<i32>,
+    pub static_filter_c: Option<i32>,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
