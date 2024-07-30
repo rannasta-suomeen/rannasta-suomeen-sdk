@@ -243,7 +243,7 @@ CREATE TABLE cabinets (
 CREATE TABLE shared_cabinets (
     cabinet_id SERIAL NOT NULL,
     user_id SERIAL NOT NULL,
-    user_username TEXT UNIQUE NOT NULL,
+    user_username TEXT NOT NULL,
 
     FOREIGN KEY (cabinet_id) REFERENCES cabinets (id),
     FOREIGN KEY (user_id) REFERENCES users (id),

@@ -104,6 +104,42 @@ pub async fn fetch_recipes(
     Ok(page)
 }
 
+
+pub async fn list_recipes_by_incredient(incredient_id: i32, offset: i64, pool: &Pool<Postgres>) -> Result<PageContext<RecipeRow>, potion::Error> {
+    let rows: Vec<RecipeRowPartial> = sqlx::query_as("
+        SELECT r.*, count(rr) OVER()
+        FROM recipe_parts rp
+        INNER JOIN drink_recipes r ON r.recipe_id = rp.recipe_id
+        INNER JOIN drink_recipes rr ON rr.id = r.id
+        WHERE rp.incredient_id = $1
+    ")
+        .bind(incredient_id)
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    let rows: Vec<RecipeRow> = rows.into_iter().map(|row| RecipeRow::from(row)).collect();
+    let total_count = *&rows.get(0).map(|p| p.count).unwrap_or(0);
+    let page = PageContext::from_rows(rows, total_count, RECIPE_COUNT_PER_PAGE, offset);
+
+    Ok(page)
+}
+
+pub async fn recipe_count_by_incredient(incredient_id: i32, pool: &Pool<Postgres>) -> Result<i64, potion::Error> {
+    let count: (i64,) = sqlx::query_as("
+        SELECT count(r) as count
+        FROM recipe_parts rp
+        INNER JOIN drink_recipes r ON r.recipe_id = rp.recipe_id
+        WHERE rp.incredient_id = $1
+    ")
+        .bind(incredient_id)
+        .fetch_one(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(count.0)
+}
+
 pub async fn list_recipe_parts(
     pool: &Pool<Postgres>,
     recipe_id: i32,
