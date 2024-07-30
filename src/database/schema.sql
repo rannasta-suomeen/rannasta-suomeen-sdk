@@ -139,7 +139,10 @@ CREATE TABLE drink_incredients (
     superalko_product_count INTEGER NOT NULL DEFAULT 0,
 
     use_static_filter BOOLEAN DEFAULT false,
+    use_static_filter_c BOOLEAN DEFAULT false,
+
     static_filter INTEGER NULL DEFAULT NULL,
+    static_filter_c INTEGER NULL DEFAULT NULL,
 
     FOREIGN KEY (author_id) REFERENCES users (id),
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
