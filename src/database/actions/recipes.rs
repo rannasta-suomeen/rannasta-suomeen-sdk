@@ -18,6 +18,15 @@ use crate::{
 use potion::{pagination::PageContext, HtmlError};
 use sqlx::{Pool, Postgres};
 
+pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {
+    let rows: Vec<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes")
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(rows)
+}
+
 pub async fn fetch_recipes(
     category: Option<RecipeType>,
     order: Option<RecipeOrder>,
