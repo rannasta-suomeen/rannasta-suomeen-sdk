@@ -1,5 +1,5 @@
 use potion::HtmlError;
-use sqlx::{Pool, Postgres};
+use sqlx::{FromRow, Pool, Postgres, QueryBuilder};
 
 use crate::{
     authentication::permissions::ActionType,
@@ -25,6 +25,8 @@ pub async fn create_cabinet(
             .await
             .map_err(|e| QueryError::from(e).into())?;
 
+    add_user_to_cabinet(id.0, user_id, &pool).await?;
+
     Ok(id.0)
 }
 
@@ -41,6 +43,7 @@ pub async fn list_own_cabinets(
     Ok(list)
 }
 
+/// Also lists owned cabinets, just includes friend cabinets too
 pub async fn list_friend_cabinets(
     user_id: i32,
     pool: &Pool<Postgres>,
@@ -225,6 +228,78 @@ pub async fn add_to_cabinet(
             .new("Product is already in the cabinet")
             .into());
     }
+
+    Ok(())
+}
+
+/// Note: This method will perform automatic checks to determine the ownerships of imported products
+/// * This is due to the fact that such check would be impossible to implement outside this method withot additiona overhead
+pub async fn add_to_cabinet_bulk(
+    cabinet_id: i32,
+    id_map: Vec<i32>,
+    user_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let product_list: Vec<CabinetProduct> = fetch_cabinet_products(id_map, &pool)
+        .await?
+        .drain(..)
+        .filter(|p| p.owner_id == user_id)
+        .collect();
+
+    insert_cabinet_products(cabinet_id, product_list, user_id, &pool).await?;
+
+    Ok(())
+}
+
+pub async fn fetch_cabinet_products(
+    id_map: Vec<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<Vec<CabinetProduct>, potion::Error> {
+    let mut query_builder: QueryBuilder<Postgres> =
+        QueryBuilder::new("SELECT * FROM cabinet_products WHERE id IN ");
+
+    query_builder.push_tuples(id_map.iter().take(65535 / 4), |mut b, id| {
+        b.push_bind(id);
+    });
+
+    let list: Vec<CabinetProduct> = query_builder
+        .build()
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?
+        .iter()
+        .filter_map(|row| CabinetProduct::from_row(row).ok())
+        .collect();
+
+    Ok(list)
+}
+
+pub async fn insert_cabinet_products(
+    cabinet_id: i32,
+    product_map: Vec<CabinetProduct>,
+    user_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        "INSERT INTO cabinet_products (cabinet_id, product_id, owner_id, name, img, href, abv, amount_ml) ",
+    );
+
+    query_builder.push_values(product_map.iter().take(65535 / 4), |mut b, product| {
+        b.push_bind(cabinet_id)
+            .push_bind(&product.product_id)
+            .push_bind(user_id)
+            .push_bind(&product.name)
+            .push_bind(&product.img)
+            .push_bind(&product.href)
+            .push_bind(&product.abv)
+            .push_bind(&product.amount_ml);
+    });
+
+    query_builder
+        .build()
+        .execute(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
 
     Ok(())
 }
