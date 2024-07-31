@@ -83,8 +83,8 @@ pub async fn get_product_subcategory(
 pub async fn fetch_all_products(pool: &Pool<Postgres>) -> Result<Vec<Product>, potion::Error> {
     let rows: Vec<Product> = sqlx::query_as(
         "
-                            SELECT * FROM products
-                        ",
+            SELECT * FROM products
+        ",
     )
     .fetch_all(pool)
     .await
