@@ -6,7 +6,10 @@ use sqlx::{Pool, Postgres, QueryBuilder};
 use crate::{
     authentication::permissions::ActionType,
     error::QueryError,
-    schema::{Incredient, IncredientFilterObject, ProductOrder, ProductRow, ProductType, RecipeAvailability},
+    schema::{
+        Incredient, IncredientFilterObject, ProductOrder, ProductRow, ProductType,
+        RecipeAvailability,
+    },
 };
 
 use crate::{
@@ -251,38 +254,38 @@ pub async fn fetch_product_filter(
     incredient_id: i32,
     availability: Option<RecipeAvailability>,
     order: Option<ProductOrder>,
-    offset: i64
+    offset: i64,
 ) -> Result<PageContext<ProductRow>, potion::Error> {
     let availability = availability
-    .map(|availability| match availability {
-        RecipeAvailability::Any => "",
-        RecipeAvailability::Alko => "AND p.retailer = 'alko'",
-        RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
-    })
-    .unwrap_or("");
+        .map(|availability| match availability {
+            RecipeAvailability::Any => "",
+            RecipeAvailability::Alko => "AND p.retailer = 'alko'",
+            RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
+        })
+        .unwrap_or("");
 
     let order = order
-    .map(|order| match order {
-        ProductOrder::Alphabetical => "name",
-        ProductOrder::PriceAsc => "p.price ASC",
-        ProductOrder::PriceDesc => "p.price DESC",
-        ProductOrder::UnitPriceAsc => "p.unit_price ASC",
-        ProductOrder::UnitPriceDesc => "p.unit_price DESC",
-        ProductOrder::AerAsc => "p.aer ASC",
-        ProductOrder::AerDesc => "p.aer DESC",
-    })
-    .unwrap_or("name");
+        .map(|order| match order {
+            ProductOrder::Alphabetical => "name",
+            ProductOrder::PriceAsc => "p.price ASC",
+            ProductOrder::PriceDesc => "p.price DESC",
+            ProductOrder::UnitPriceAsc => "p.unit_price ASC",
+            ProductOrder::UnitPriceDesc => "p.unit_price DESC",
+            ProductOrder::AerAsc => "p.aer ASC",
+            ProductOrder::AerDesc => "p.aer DESC",
+        })
+        .unwrap_or("name");
 
-    let rows: Vec<ProductRow> = sqlx::query_as(
-        &format!("
+    let rows: Vec<ProductRow> = sqlx::query_as(&format!(
+        "
         SELECT p.*, COUNT(pp) OVER()
         FROM incredient_product_filters f
         RIGHT JOIN products p ON p.id = f.product_id
         RIGHT JOIN products pp ON pp.id = p.id
         WHERE f.incredient_id = $1 {availability}
         ORDER BY {order}
-    "),
-    )
+    "
+    ))
     .bind(incredient_id)
     .fetch_all(&*pool)
     .await
