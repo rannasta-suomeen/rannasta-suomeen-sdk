@@ -57,6 +57,8 @@ pub async fn fetch_recipes(
             RecipeOrder::AerAlkoDesc => "alko_aer DESC",
             RecipeOrder::AerSuperalkoAsc => "superalko_aer",
             RecipeOrder::AerSuperalkoDesc => "superalko_aer DESC",
+            RecipeOrder::ServingsAsc => "standard_servings",
+            RecipeOrder::ServingsDesc => "standard_servings DESc",
         })
         .unwrap_or("name");
 

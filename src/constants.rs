@@ -29,6 +29,8 @@ pub const RECIPE_ORDERS: &[(&str, &str)] = &[
     ("alphabetical", "Name"),
     ("abv_asc", "ABV (asc)"),
     ("abv_desc", "ABV (desc)"),
+    ("servings_asc", "Standard servings (asc)"),
+    ("servings_desc", "Standard servings (desc)"),
     ("aer_superalko_asc", "Aer Superalko (asc)"),
     ("aer_superalko_desc", "Aer Superalko (desc)"),
     ("aer_alko_asc", "Aer Alko (asc)"),
