@@ -349,7 +349,7 @@ pub async fn set_product_c_filter(
 
 pub async fn insert_product_filter(
     id: i32,
-    id_map: Vec<i32>,
+    id_map: &[i32],
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     if id_map.len() > 0 {
