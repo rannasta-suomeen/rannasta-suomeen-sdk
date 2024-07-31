@@ -236,23 +236,23 @@ pub async fn add_to_cabinet(
 /// * This is due to the fact that such check would be impossible to implement outside this method withot additiona overhead
 pub async fn add_to_cabinet_bulk(
     cabinet_id: i32,
-    id_map: Vec<i32>,
+    id_map: &[i32],
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    let product_list: Vec<CabinetProduct> = fetch_cabinet_products(id_map, &pool)
+    let product_list: Vec<CabinetProduct> = fetch_cabinet_products(&id_map, &pool)
         .await?
         .drain(..)
         .filter(|p| p.owner_id == user_id)
         .collect();
 
-    insert_cabinet_products(cabinet_id, product_list, user_id, &pool).await?;
+    insert_cabinet_products(cabinet_id, &product_list, user_id, &pool).await?;
 
     Ok(())
 }
 
 pub async fn fetch_cabinet_products(
-    id_map: Vec<i32>,
+    id_map: &[i32],
     pool: &Pool<Postgres>,
 ) -> Result<Vec<CabinetProduct>, potion::Error> {
     let mut query_builder: QueryBuilder<Postgres> =
@@ -276,7 +276,7 @@ pub async fn fetch_cabinet_products(
 
 pub async fn insert_cabinet_products(
     cabinet_id: i32,
-    product_map: Vec<CabinetProduct>,
+    product_map: &[CabinetProduct],
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
