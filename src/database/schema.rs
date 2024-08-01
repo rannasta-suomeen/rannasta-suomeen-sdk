@@ -670,11 +670,11 @@ pub struct RecipePart {
 impl RecipePart {
     pub fn into_recipe_string(list: &Vec<Self>) -> String {
         let mut s = String::from("Ingredients: ");
-        
+
         list.iter().for_each(|part| {
             s += &format!("{}{} {}, ", part.amount, part.unit.to_string(), part.name);
         });
-        
+
         s
     }
 }

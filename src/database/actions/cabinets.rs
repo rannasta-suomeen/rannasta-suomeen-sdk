@@ -255,7 +255,6 @@ pub async fn fetch_cabinet_products(
     id_map: &[i32],
     pool: &Pool<Postgres>,
 ) -> Result<Vec<CabinetProduct>, potion::Error> {
-
     if id_map.len() <= 0 {
         return Ok(vec![]);
     }
@@ -285,7 +284,6 @@ pub async fn insert_cabinet_products(
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-
     if product_map.len() <= 0 {
         return Ok(());
     }

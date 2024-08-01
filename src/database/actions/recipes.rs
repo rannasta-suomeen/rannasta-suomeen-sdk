@@ -43,17 +43,30 @@ pub async fn fetch_recipes(
             RecipeAvailability::Superalko => "AND r.available_superalko",
         })
         .unwrap_or("");
-    
+
     if let Some(order) = &order {
-        if [RecipeOrder::AerAlkoAsc, RecipeOrder::AerAlkoDesc, RecipeOrder::PriceAlkoAsc, RecipeOrder::PriceAlkoDesc].contains(order) {
+        if [
+            RecipeOrder::AerAlkoAsc,
+            RecipeOrder::AerAlkoDesc,
+            RecipeOrder::PriceAlkoAsc,
+            RecipeOrder::PriceAlkoDesc,
+        ]
+        .contains(order)
+        {
             availability = "AND r.available_alko";
         }
 
-        if [RecipeOrder::AerSuperalkoAsc, RecipeOrder::AerSuperalkoDesc, RecipeOrder::PriceSuperalkoAsc, RecipeOrder::PriceSuperalkoDesc].contains(&order) {
+        if [
+            RecipeOrder::AerSuperalkoAsc,
+            RecipeOrder::AerSuperalkoDesc,
+            RecipeOrder::PriceSuperalkoAsc,
+            RecipeOrder::PriceSuperalkoDesc,
+        ]
+        .contains(&order)
+        {
             availability = "AND r.available_superalko";
         }
     }
-    
 
     let order = order
         .map(|order| match order {
