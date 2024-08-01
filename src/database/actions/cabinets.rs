@@ -255,6 +255,11 @@ pub async fn fetch_cabinet_products(
     id_map: &[i32],
     pool: &Pool<Postgres>,
 ) -> Result<Vec<CabinetProduct>, potion::Error> {
+
+    if id_map.len() <= 0 {
+        return Ok(vec![]);
+    }
+
     let mut query_builder: QueryBuilder<Postgres> =
         QueryBuilder::new("SELECT * FROM cabinet_products WHERE id IN ");
 
@@ -280,6 +285,11 @@ pub async fn insert_cabinet_products(
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
+
+    if product_map.len() <= 0 {
+        return Ok(());
+    }
+
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         "INSERT INTO cabinet_products (cabinet_id, product_id, owner_id, name, img, href, abv, amount_ml) ",
     );
