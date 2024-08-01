@@ -229,6 +229,26 @@ pub async fn get_product_filter_noname_all(
     Ok(res)
 }
 
+pub async fn get_incredient_author(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Option<String>, potion::Error> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "
+        SELECT u.username 
+        FROM drink_incredients d
+        INNER JOIN users u ON u.id = d.author_id
+        WHERE d.id = $1
+    ",
+    )
+    .bind(id)
+    .fetch_optional(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|x| x.0))
+}
+
 pub async fn get_product_filter(
     pool: &Pool<Postgres>,
     incredient_id: i32,

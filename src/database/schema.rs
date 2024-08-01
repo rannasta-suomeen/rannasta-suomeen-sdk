@@ -109,6 +109,19 @@ impl TryFrom<Value> for UnitType {
     }
 }
 
+impl ToString for UnitType {
+    fn to_string(&self) -> String {
+        match self {
+            UnitType::Cl => String::from("cl"),
+            UnitType::Ml => String::from("ml"),
+            UnitType::Oz => String::from("oz"),
+            UnitType::Kpl => String::from("kpl"),
+            UnitType::Tl => String::from("tl"),
+            UnitType::Dash => String::from("dash"),
+        }
+    }
+}
+
 impl UnitType {
     /* conversion table */
     pub fn convert(&self, value: f64, other: Self) -> (Self, f64) {
@@ -207,6 +220,8 @@ pub enum RecipeOrder {
     Alphabetical,
     AbvAsc,
     AbvDesc,
+    ServingsAsc,
+    ServingsDesc,
     AerAlkoAsc,
     AerAlkoDesc,
     AerSuperalkoAsc,
@@ -226,6 +241,8 @@ impl TryFrom<Value> for RecipeOrder {
                 "alphabetical" => Ok(Self::Alphabetical),
                 "abv_asc" => Ok(Self::AbvAsc),
                 "abv_desc" => Ok(Self::AbvDesc),
+                "servings_asc" => Ok(Self::ServingsAsc),
+                "servings_desc" => Ok(Self::ServingsDesc),
                 "aer_alko_asc" => Ok(Self::AerAlkoAsc),
                 "aer_alko_desc" => Ok(Self::AerAlkoDesc),
                 "aer_superalko_asc" => Ok(Self::AerSuperalkoAsc),
@@ -648,6 +665,18 @@ pub struct RecipePart {
     pub amount: i32,
     pub unit: UnitType,
     pub name: String,
+}
+
+impl RecipePart {
+    pub fn into_recipe_string(list: &Vec<Self>) -> String {
+        let mut s = String::from("Ingredients: ");
+
+        list.iter().for_each(|part| {
+            s += &format!("{}{} {}, ", part.amount, part.unit.to_string(), part.name);
+        });
+
+        s
+    }
 }
 
 #[derive(Serialize, Deserialize)]
