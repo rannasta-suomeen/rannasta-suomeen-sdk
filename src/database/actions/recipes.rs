@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     authentication::permissions::ActionType,
     error::QueryError,
-    schema::{Recipe, RecipePart, RecipeRow, RecipeType, UnitType},
+    schema::{Recipe, RecipePart, RecipePartNoname, RecipeRow, RecipeType, UnitType},
 };
 
 use crate::{
@@ -185,6 +185,17 @@ pub async fn list_recipe_parts(
         WHERE rp.recipe_id = $1
     ")
     .bind(recipe_id)
+    .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
+
+    Ok(rows)
+}
+
+pub async fn list_recipe_parts_all(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<RecipePartNoname>, potion::Error> {
+    let rows: Vec<RecipePartNoname> = sqlx::query_as("
+        SELECT recipe_id, incredient_id FROM recipe_parts
+    ")
     .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)

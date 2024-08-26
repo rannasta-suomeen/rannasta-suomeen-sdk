@@ -8,7 +8,7 @@ use crate::{
     error::QueryError,
     schema::{
         Incredient, IncredientFilterObject, ProductOrder, ProductRow, ProductType,
-        RecipeAvailability,
+        RecipeAvailability, UnitType,
     },
 };
 
@@ -200,6 +200,21 @@ pub async fn get_incredient_mut(
     }
 }
 
+pub async fn list_product_filter_noname(
+    pool: &Pool<Postgres>,
+) -> Result<Vec<IncredientFilterObjectNoName>, potion::Error> {
+    let rows: Vec<IncredientFilterObjectNoName> = sqlx::query_as(
+        "
+        SELECT * FROM incredient_product_filters
+    ",
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(rows)
+}
+
 pub async fn get_product_filter_noname_all(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<IngredientFilterList>, potion::Error> {
@@ -321,11 +336,13 @@ pub async fn update_incredient_info(
     id: i32,
     category: Option<ProductType>,
     name: String,
+    unit: UnitType,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE drink_incredients SET name = $1, type = $2 WHERE id = $3")
+    sqlx::query("UPDATE drink_incredients SET name = $1, type = $2, unit = $3 WHERE id = $4")
         .bind(name)
         .bind(category)
+        .bind(unit)
         .bind(id)
         .execute(&*pool)
         .await

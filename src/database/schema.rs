@@ -357,6 +357,23 @@ pub struct Incredient {
     pub use_static_filter_c: bool,
     pub static_filter: Option<i32>,
     pub static_filter_c: Option<i32>,
+
+    pub unit: UnitType
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IncredientMinimal {
+    pub id: Uuid,
+    pub name: String,
+}
+
+impl Into<IncredientMinimal> for &Incredient {
+    fn into(self) -> IncredientMinimal {
+        IncredientMinimal {
+            id: self.id,
+            name: self.name.clone()
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
@@ -548,6 +565,11 @@ impl FromRow<'_, PgRow> for Recipe {
     }
 }
 
+pub struct RecipeMinimal {
+    pub id: Uuid,
+    pub r#type: RecipeType,
+}
+
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RecipeRowPartial {
     pub id: Uuid,
@@ -677,6 +699,12 @@ impl RecipePart {
 
         s
     }
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
+pub struct RecipePartNoname {
+    pub recipe_id: Uuid,
+    pub incredient_id: Uuid,
 }
 
 #[derive(Serialize, Deserialize)]
