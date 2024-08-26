@@ -193,10 +193,14 @@ pub async fn list_recipe_parts(
 pub async fn list_recipe_parts_all(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<RecipePartNoname>, potion::Error> {
-    let rows: Vec<RecipePartNoname> = sqlx::query_as("
+    let rows: Vec<RecipePartNoname> = sqlx::query_as(
+        "
         SELECT recipe_id, incredient_id FROM recipe_parts
-    ")
-    .fetch_all(pool).await.map_err(|e| QueryError::from(e).into())?;
+    ",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)
 }

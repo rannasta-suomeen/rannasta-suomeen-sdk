@@ -358,7 +358,7 @@ pub struct Incredient {
     pub static_filter: Option<i32>,
     pub static_filter_c: Option<i32>,
 
-    pub unit: UnitType
+    pub unit: UnitType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -371,7 +371,7 @@ impl Into<IncredientMinimal> for &Incredient {
     fn into(self) -> IncredientMinimal {
         IncredientMinimal {
             id: self.id,
-            name: self.name.clone()
+            name: self.name.clone(),
         }
     }
 }
