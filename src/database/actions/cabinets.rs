@@ -5,12 +5,12 @@ use crate::{
     authentication::permissions::ActionType,
     cryptography::generate_access_token,
     error::QueryError,
-    schema::{Cabinet, CabinetMember, CabinetProduct},
+    schema::{Cabinet, CabinetMember, CabinetMixer, CabinetMixerOwned, CabinetProduct},
 };
 
 use crate::jwt::SessionData;
 
-use super::{get_product, get_user_by_id};
+use super::{get_incredient, get_product, get_user_by_id};
 
 pub async fn create_cabinet(
     name: &str,
@@ -154,11 +154,44 @@ pub async fn list_cabinet_products(
     pool: &Pool<Postgres>,
 ) -> Result<Vec<CabinetProduct>, potion::Error> {
     let list: Vec<CabinetProduct> =
-        sqlx::query_as("SELECT * FROM cabinet_products WHERE cabinet_id = $1")
+        sqlx::query_as("SELECT * FROM cabinet_products WHERE cabinet_id = $1 ORDER BY id")
             .bind(id)
             .fetch_all(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(list)
+}
+
+pub async fn list_cabinet_mixers(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Vec<CabinetMixerOwned>, potion::Error> {
+    let list: Vec<CabinetMixer> =
+        sqlx::query_as("SELECT * FROM cabinet_mixers WHERE cabinet_id = $1 ORDER BY id")
+            .bind(id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    let b: Vec<CabinetMixerOwned> = vec![];
+    let list = list.into_iter().fold(b, |mut a, v| {
+        if let Some(c) = a.iter_mut().find(|m| m.incredient_id == v.incredient_id) {
+            c.owners.push(v.owner_id);
+            if let Some(amount) = v.amount {
+                c.owner_map.insert(v.owner_id, v.amount);
+                match c.amount {
+                    Some(c_amount) => c.amount = Some(c_amount + amount),
+                    None => c.amount = Some(amount),
+                }
+            } else {
+                c.amount = None;
+            }
+        } else {
+            a.push(CabinetMixerOwned::from(v));
+        }
+        a
+    });
 
     Ok(list)
 }
@@ -190,6 +223,59 @@ pub async fn modify_in_cabinet(
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+    Ok(())
+}
+
+pub async fn get_cabinet_mixer(
+    i_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Option<CabinetMixer>, potion::Error> {
+    let mixer: Option<CabinetMixer> = sqlx::query_as("SELECT * FROM cabinet_mixers WHERE id = $1")
+        .bind(i_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(mixer)
+}
+
+pub async fn get_cabinet_mixer_owned(
+    id: i32,
+    incredient_id: i32,
+    user_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Option<CabinetMixer>, potion::Error> {
+    let mixer: Option<CabinetMixer> = sqlx::query_as("SELECT * FROM cabinet_mixers WHERE cabinet_id = $1 AND incredient_id = $2 AND owner_id = $3")
+        .bind(id)
+        .bind(incredient_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(mixer)
+}
+
+pub async fn modify_mixer_in_cabinet(
+    id: i32,
+    incredient_id: i32,
+    user_id: i32,
+    amount: Option<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let mixer = get_cabinet_mixer_owned(id, incredient_id, user_id, pool).await?;
+    if mixer.is_none() {
+        add_mixer_to_cabinet(id, user_id, incredient_id, amount, pool).await?;
+    } else {
+        sqlx::query("UPDATE cabinet_mixers SET amount = $1 WHERE cabinet_id = $2 AND incredient_id = $3 AND owner_id = $4")
+            .bind(amount)
+            .bind(id)
+            .bind(incredient_id)
+            .bind(user_id)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+    }
     Ok(())
 }
 
@@ -226,6 +312,43 @@ pub async fn add_to_cabinet(
     if result.rows_affected() <= 0 {
         return Err(HtmlError::InvalidRequest
             .new("Product is already in the cabinet")
+            .into());
+    }
+
+    Ok(())
+}
+
+pub async fn add_mixer_to_cabinet(
+    id: i32,
+    user_id: i32,
+    ingredient_id: i32,
+    amount_ml: Option<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let ingredient = get_incredient(ingredient_id, pool).await?;
+    if ingredient.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Product with specified id doesn't exists"));
+    }
+    let incredient = ingredient.unwrap();
+
+    let result = sqlx::query(
+        "INSERT INTO cabinet_mixers (cabinet_id, incredient_id, owner_id, name, unit, amount)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT DO NOTHING RETURNING *",
+    )
+    .bind(id)
+    .bind(incredient.id)
+    .bind(user_id)
+    .bind(incredient.name)
+    .bind(incredient.unit)
+    .bind(amount_ml)
+    .execute(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    if result.rows_affected() <= 0 {
+        return Err(HtmlError::InvalidRequest
+            .new("Mixer is already in the cabinet")
             .into());
     }
 

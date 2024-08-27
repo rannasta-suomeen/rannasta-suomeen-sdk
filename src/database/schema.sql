@@ -144,6 +144,8 @@ CREATE TABLE drink_incredients (
     static_filter INTEGER NULL DEFAULT NULL,
     static_filter_c INTEGER NULL DEFAULT NULL,
 
+    unit unit_type NOT NULL DEFAULT 'ml', 
+
     FOREIGN KEY (author_id) REFERENCES users (id),
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
 );
@@ -269,6 +271,22 @@ CREATE TABLE cabinet_products (
     amount_ml INT NULL DEFAULT NULL,
 
     PRIMARY KEY (id, product_id, owner_id)
+);
+
+CREATE TABLE cabinet_mixers (
+    id SERIAL NOT NULL,
+    cabinet_id SERIAL NOT NULL,
+    incredient_id SERIAL NOT NULL,
+
+    owner_id SERIAL NOT NULL,
+
+    name TEXT NOT NULL,
+
+    usable BOOLEAN DEFAULT true,
+    unit unit_type NOT NULL, 
+    amount INT NULL DEFAULT NULL,
+
+    PRIMARY KEY (id, incredient_id, owner_id)
 );
 
 /* Caches */
