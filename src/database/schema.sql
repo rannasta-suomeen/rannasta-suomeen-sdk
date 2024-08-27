@@ -273,7 +273,7 @@ CREATE TABLE cabinet_products (
     PRIMARY KEY (id, product_id, owner_id)
 );
 
-CREATE TABLE cabinet_mixers_products (
+CREATE TABLE cabinet_mixers (
     id SERIAL NOT NULL,
     cabinet_id SERIAL NOT NULL,
     incredient_id SERIAL NOT NULL,

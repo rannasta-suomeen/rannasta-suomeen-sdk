@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use potion::TypeError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -119,6 +121,12 @@ impl ToString for UnitType {
             UnitType::Tl => String::from("tl"),
             UnitType::Dash => String::from("dash"),
         }
+    }
+}
+
+impl Default for UnitType {
+    fn default() -> Self {
+        Self::Ml
     }
 }
 
@@ -792,6 +800,48 @@ pub struct CabinetProduct {
 
     pub amount_ml: Option<i32>,
     pub usable: bool,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
+pub struct CabinetMixer {
+    pub id: Uuid,
+    pub cabinet_id: Uuid,
+    pub incredient_id: Uuid,
+    pub owner_id: Uuid,
+
+    pub name: String,
+    pub unit: UnitType,
+
+    pub amount: Option<i32>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct CabinetMixerOwned {
+    pub id: Uuid,
+    pub cabinet_id: Uuid,
+    pub incredient_id: Uuid,
+
+    pub name: String,
+    pub unit: UnitType,
+
+    pub amount: Option<i32>,
+    pub owners: Vec<i32>,
+    pub owner_map: BTreeMap<i32, Option<i32>>,
+}
+
+impl From<CabinetMixer> for CabinetMixerOwned {
+    fn from(value: CabinetMixer) -> Self {
+        Self {
+            id: value.id,
+            cabinet_id: value.cabinet_id,
+            incredient_id: value.incredient_id,
+            name: value.name,
+            unit: value.unit,
+            amount: value.amount,
+            owners: vec![value.owner_id],
+            owner_map: BTreeMap::from([(value.owner_id, value.amount)]),
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
