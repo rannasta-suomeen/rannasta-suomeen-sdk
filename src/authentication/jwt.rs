@@ -9,6 +9,7 @@ use serde::Serialize;
 use sha2::Sha256;
 
 use crate::database::schema::User;
+use crate::schema::Cabinet;
 use crate::schema::UserRole;
 
 use super::permissions::ActionType;
@@ -70,9 +71,27 @@ impl Into<SessionData> for JwtSessionData {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CabinetRecipeAccessKey {
+    pub cabinet_id: i32,
+    pub cabinet_name: String,
+    pub checksum: String,
+}
+
 pub fn generate_jwt_session(user: &User) -> String {
     let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
     let claims = JwtSessionData::new(user.id, user.username.to_owned(), user.uid.to_owned());
+
+    claims.sign_with_key(&key).unwrap()
+}
+
+pub fn generate_cabinet_access_key(cabinet: &Cabinet) -> String {
+    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
+    let claims = CabinetRecipeAccessKey {
+        cabinet_id: cabinet.id,
+        cabinet_name: cabinet.name.clone(),
+        checksum: cabinet.checksum.clone(),
+    };
 
     claims.sign_with_key(&key).unwrap()
 }
@@ -91,4 +110,12 @@ pub fn verify_jwt_session(token: String) -> Result<JwtSessionData, potion::Error
             }
             return Ok(session);
         })?
+}
+
+pub fn parse_cabinet_access_key(token: String) -> Result<CabinetRecipeAccessKey, potion::Error> {
+    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
+
+    token
+        .verify_with_key(&key)
+        .map_err(|_| HtmlError::InvalidRequest.new("Invalid token"))
 }

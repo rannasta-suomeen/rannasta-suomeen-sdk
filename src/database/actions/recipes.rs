@@ -195,7 +195,7 @@ pub async fn list_recipe_parts_all(
 ) -> Result<Vec<RecipePartNoname>, potion::Error> {
     let rows: Vec<RecipePartNoname> = sqlx::query_as(
         "
-        SELECT recipe_id, incredient_id FROM recipe_parts
+        SELECT * FROM recipe_parts
     ",
     )
     .fetch_all(pool)
@@ -324,6 +324,19 @@ pub async fn get_recipe(id: i32, pool: &Pool<Postgres>) -> Result<Option<Recipe>
     let row: Option<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes WHERE id = $1")
         .bind(id)
         .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row)
+}
+
+pub async fn get_recipe_owned(
+    id: i32,
+    pool: Pool<Postgres>,
+) -> Result<Option<Recipe>, potion::Error> {
+    let row: Option<Recipe> = sqlx::query_as("SELECT * FROM drink_recipes WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
 

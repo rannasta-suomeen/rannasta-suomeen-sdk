@@ -22,4 +22,7 @@ sha2 = "0.10.8"
 hmac = "0.12.1"
 chrono = "0.4.26"
 rand = "0.8.5"
-redis = "0.26.0"
+redis = {version = "0.26.0", features = ["tokio-comp", "aio"]}
+uuid = { version = "1.10.0", features = ["v4"] }
+redis-macros = "0.4.0"
+log = "0.4.22"

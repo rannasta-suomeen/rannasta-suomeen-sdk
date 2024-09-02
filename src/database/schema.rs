@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::cache::cache::Cacheable;
 use potion::TypeError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -534,6 +535,9 @@ pub struct Recipe {
     pub available_alko: bool,
 }
 
+impl Cacheable for Recipe {}
+impl Cacheable for Option<Recipe> {}
+
 impl FromRow<'_, PgRow> for Recipe {
     fn from_row(row: &'_ PgRow) -> Result<Self, sqlx::Error> {
         let tag_list_string: String = row.try_get("tag_list")?;
@@ -576,6 +580,15 @@ impl FromRow<'_, PgRow> for Recipe {
 pub struct RecipeMinimal {
     pub id: Uuid,
     pub r#type: RecipeType,
+}
+
+impl From<Recipe> for RecipeMinimal {
+    fn from(value: Recipe) -> Self {
+        Self {
+            id: value.id,
+            r#type: value.r#type,
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
@@ -709,10 +722,15 @@ impl RecipePart {
     }
 }
 
+impl Cacheable for RecipePart {}
+impl Cacheable for Vec<RecipePart> {}
+
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RecipePartNoname {
     pub recipe_id: Uuid,
     pub incredient_id: Uuid,
+    pub amount: i32,
+    pub unit: UnitType,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -777,6 +795,7 @@ pub struct Cabinet {
     pub name: String,
 
     pub access_key: Option<String>,
+    pub checksum: String,
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]
