@@ -1,13 +1,11 @@
 use std::{fmt::Debug, future::Future};
 
+use potion::HtmlError;
 use redis::{aio::MultiplexedConnection, AsyncCommands, FromRedisValue, ToRedisArgs};
 use redis_macros::{FromRedisValue, ToRedisArgs};
 use serde::{Deserialize, Serialize};
 
 use crate::error::CacheError;
-
-/// General trait for structs that can be cached
-pub trait Cacheable: serde::Serialize + Send + Sync + Debug + Clone {}
 
 // Caching - keys
 
@@ -35,7 +33,7 @@ impl<T: ToString + Serialize> Into<String> for &CacheKey<T> {
         match self._type {
             CacheKeyType::Recipe => format!("recipe-{}", self._value.to_string()),
             CacheKeyType::Ingredient => format!("incredient-{}", self._value.to_string()),
-            CacheKeyType::RecipeParts => format!("recipe-parts-{}", self._value.to_string()),
+            CacheKeyType::Custom(_) => self._value.to_string(),
         }
     }
 }
@@ -43,8 +41,8 @@ impl<T: ToString + Serialize> Into<String> for &CacheKey<T> {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CacheKeyType {
     Recipe,
-    RecipeParts,
     Ingredient,
+    Custom(String),
 }
 
 impl CacheKeyType {
@@ -57,8 +55,8 @@ impl<T: ToString + Serialize> Into<CacheLifetime> for CacheKey<T> {
     fn into(self) -> CacheLifetime {
         match self._type {
             CacheKeyType::Recipe => CacheLifetime::BindRecipeCache,
-            CacheKeyType::RecipeParts => CacheLifetime::BindRecipeCache,
             CacheKeyType::Ingredient => CacheLifetime::BindIncredientCache,
+            CacheKeyType::Custom(value) => CacheLifetime::Custom(value),
         }
     }
 }
@@ -68,6 +66,7 @@ impl<T: ToString + Serialize> Into<CacheLifetime> for CacheKey<T> {
 #[derive(Serialize, Deserialize, Clone)]
 pub enum CacheLifetime {
     Infinite,
+    Custom(String),
     BindGlobalCache,
     BindRecipeCache,
     BindIncredientCache,
@@ -89,26 +88,37 @@ impl CacheLifetime {
             CacheLifetime::BindIncredientCache => {
                 get_cache_value::<&str, String>("ingredient-cache-key", cache).await
             }
+            CacheLifetime::Custom(value) => Ok(Some(value.to_owned())),
         }
     }
 
     pub async fn validate_cache_bind(
         &self,
         bind: &Option<String>,
+        lifetime: Self,
         cache: &mut MultiplexedConnection,
     ) -> Result<bool, potion::Error> {
-        Ok(bind == &self.get_cache_bind(cache).await?)
+        match self {
+            CacheLifetime::Custom(value) => match lifetime {
+                CacheLifetime::Custom(_value) => Ok(value == &_value),
+                _ => {
+                    log::error!("Found conflicting bindings");
+                    Err(HtmlError::InternalServerError.new("Conflicting cache bindings"))
+                }
+            },
+            _ => Ok(bind == &self.get_cache_bind(cache).await?),
+        }
     }
 }
 
 #[derive(Serialize, serde::Deserialize, FromRedisValue, ToRedisArgs, Clone)]
-pub struct RedisValue<T: Cacheable> {
+pub struct RedisValue<T: serde::Serialize + Send + Sync + Clone> {
     pub value: T,
     _lifetime: CacheLifetime,
     _bind: Option<String>,
 }
 
-impl<T: Cacheable + for<'a> Deserialize<'a>> RedisValue<T> {
+impl<T: serde::Serialize + Send + Sync + Clone + for<'a> Deserialize<'a>> RedisValue<T> {
     async fn new(
         value: T,
         lifetime: CacheLifetime,
@@ -123,9 +133,13 @@ impl<T: Cacheable + for<'a> Deserialize<'a>> RedisValue<T> {
         })
     }
 
-    async fn validate(&self, cache: &mut MultiplexedConnection) -> Result<bool, potion::Error> {
+    async fn validate<K: ToString + Serialize>(
+        &self,
+        key: CacheKey<K>,
+        cache: &mut MultiplexedConnection,
+    ) -> Result<bool, potion::Error> {
         self._lifetime
-            .validate_cache_bind(&&self._bind, cache)
+            .validate_cache_bind(&&self._bind, key.into(), cache)
             .await
     }
 
@@ -140,15 +154,27 @@ impl<T: Cacheable + for<'a> Deserialize<'a>> RedisValue<T> {
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = Result<Option<T>, potion::Error>> + Send + 'a,
     {
-        let value = get_cache_value::<String, RedisValue<T>>((&key).into(), cache).await?;
+        let value = get_cache_value::<String, RedisValue<T>>((&key).into(), cache)
+            .await
+            .unwrap_or_else(|_| {
+                let mut c = cache.clone();
+                let k = key.to_string();
+                tokio::spawn(async move {
+                    log::error!("> Failed to serialize cached value. Deleting {}", &k);
+                    if let Err(e) = delete_cache_value(k, &mut c).await {
+                        log::error!("> Failed to delete cached value! {e}");
+                    }
+                });
+                None
+            });
         // * Cannot use .map(|| {...}) due to async closures
         let value = match value {
             Some(value) => {
-                log::info!("> Found {:?}", key._value.to_string());
-                match value.validate(cache).await? {
+                log::trace!("> Found {:?}", key.to_string());
+                match value.validate(key.to_owned(), cache).await? {
                     true => Some(value),
                     false => {
-                        log::warn!("> Invalidated {:?}", key._value.to_string());
+                        log::trace!("> Invalidated {}", key.to_string());
                         None
                     }
                 }
@@ -159,18 +185,24 @@ impl<T: Cacheable + for<'a> Deserialize<'a>> RedisValue<T> {
         match value {
             Some(value) => Ok(Some(value)),
             None => {
-                log::info!("> Fetching {:?}", key.to_string());
+                log::trace!("> Fetching {:?}", key.to_string());
                 match callback().await? {
                     Some(value) => {
                         let lifetime: CacheLifetime = key.to_owned().into();
                         let value = RedisValue::new(value, lifetime, cache).await?;
 
-                        set_cache_value::<String, RedisValue<T>>(
+                        match set_cache_value::<String, RedisValue<T>>(
                             (&key).into(),
                             value.clone(),
                             cache,
                         )
-                        .await?;
+                        .await
+                        {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!("{e:?}");
+                            }
+                        }
 
                         Ok(Some(value))
                     }
@@ -190,15 +222,27 @@ impl<T: Cacheable + for<'a> Deserialize<'a>> RedisValue<T> {
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = Result<T, potion::Error>> + Send + 'a,
     {
-        let value = get_cache_value::<String, RedisValue<T>>((&key).into(), cache).await?;
+        let value = get_cache_value::<String, RedisValue<T>>((&key).into(), cache)
+            .await
+            .unwrap_or_else(|_| {
+                let mut c = cache.clone();
+                let k = key.to_string();
+                tokio::spawn(async move {
+                    log::error!("> Failed to serialize cached value. Deleting {}", &k);
+                    if let Err(e) = delete_cache_value(k, &mut c).await {
+                        log::error!("> Failed to delete cached value! {e}");
+                    }
+                });
+                None
+            });
         // * Cannot use .map(|| {...}) due to async closures
         let value = match value {
             Some(value) => {
-                log::info!("> Found {:?}", key._value.to_string());
-                match value.validate(cache).await? {
+                log::trace!("> Found {:?}", key.to_string());
+                match value.validate(key.to_owned().into(), cache).await? {
                     true => Some(value),
                     false => {
-                        log::warn!("> Invalidated {:?}", key._value.to_string());
+                        log::trace!("> Invalidated {:?}", key.to_string());
                         None
                     }
                 }
@@ -209,12 +253,67 @@ impl<T: Cacheable + for<'a> Deserialize<'a>> RedisValue<T> {
         match value {
             Some(value) => Ok(value),
             None => {
-                log::info!("> Fetching {:?}", key._value.to_string());
+                log::trace!("> Fetching {:?}", key._value.to_string());
                 let value = callback().await?;
                 let lifetime: CacheLifetime = key.to_owned().into();
                 let value = RedisValue::new(value, lifetime, cache).await?;
 
                 set_cache_value::<String, RedisValue<T>>((&key).into(), value.clone(), cache)
+                    .await?;
+
+                Ok(value)
+            }
+        }
+    }
+
+    pub async fn get_or_list<'a, F, Fut, K>(
+        key: CacheKey<K>,
+        cache: &mut MultiplexedConnection,
+        callback: F,
+    ) -> Result<RedisValue<Vec<T>>, potion::Error>
+    where
+        Vec<T>: serde::Serialize + Send + Sync,
+        K: ToString + Serialize + Clone + Send + Sync,
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: Future<Output = Result<Vec<T>, potion::Error>> + Send + 'a,
+    {
+        let value = get_cache_value::<String, RedisValue<Vec<T>>>((&key).into(), cache)
+            .await
+            .unwrap_or_else(|_| {
+                let mut c = cache.clone();
+                let k = key.to_string();
+                tokio::spawn(async move {
+                    log::error!("> Failed to serialize cached value. Deleting {}", &k);
+                    if let Err(e) = delete_cache_value(k, &mut c).await {
+                        log::error!("> Failed to delete cached value! {e}");
+                    }
+                });
+                None
+            });
+        // * Cannot use .map(|| {...}) due to async closures
+        let value = match value {
+            Some(value) => {
+                log::trace!("> Found {:?}", key.to_string());
+                match value.validate(key.to_owned().into(), cache).await? {
+                    true => Some(value),
+                    false => {
+                        log::trace!("> Invalidated {:?}", key.to_string());
+                        None
+                    }
+                }
+            }
+            None => None,
+        };
+
+        match value {
+            Some(value) => Ok(value),
+            None => {
+                log::trace!("> Fetching {:?}", key._value.to_string());
+                let value = callback().await?;
+                let lifetime: CacheLifetime = key.to_owned().into();
+                let value = RedisValue::new(value, lifetime, cache).await?;
+
+                set_cache_value::<String, RedisValue<Vec<T>>>((&key).into(), value.clone(), cache)
                     .await?;
 
                 Ok(value)
@@ -232,6 +331,18 @@ pub async fn set_cache_value<K: ToRedisArgs + Send + Sync, V: ToRedisArgs + Send
 ) -> Result<(), potion::Error> {
     let _: () = cache
         .set(key, value)
+        .await
+        .map_err(|e| CacheError::from(e).into())?;
+
+    Ok(())
+}
+
+pub async fn delete_cache_value<K: ToRedisArgs + Send + Sync>(
+    key: K,
+    cache: &mut MultiplexedConnection,
+) -> Result<(), potion::Error> {
+    let _: () = cache
+        .del(key)
         .await
         .map_err(|e| CacheError::from(e).into())?;
 

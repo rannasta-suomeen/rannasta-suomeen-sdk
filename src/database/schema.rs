@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use crate::cache::cache::Cacheable;
 use potion::TypeError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -535,9 +534,6 @@ pub struct Recipe {
     pub available_alko: bool,
 }
 
-impl Cacheable for Recipe {}
-impl Cacheable for Option<Recipe> {}
-
 impl FromRow<'_, PgRow> for Recipe {
     fn from_row(row: &'_ PgRow) -> Result<Self, sqlx::Error> {
         let tag_list_string: String = row.try_get("tag_list")?;
@@ -721,9 +717,6 @@ impl RecipePart {
         s
     }
 }
-
-impl Cacheable for RecipePart {}
-impl Cacheable for Vec<RecipePart> {}
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RecipePartNoname {
