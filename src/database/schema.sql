@@ -242,6 +242,8 @@ CREATE TABLE cabinets (
 
     access_key TEXT UNIQUE NULL DEFAULT NULL,
 
+    checksum TEXT UNIQUE NOT NULL,
+
     FOREIGN KEY (owner_id) REFERENCES users (id)
 );
 

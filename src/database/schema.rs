@@ -578,6 +578,15 @@ pub struct RecipeMinimal {
     pub r#type: RecipeType,
 }
 
+impl From<Recipe> for RecipeMinimal {
+    fn from(value: Recipe) -> Self {
+        Self {
+            id: value.id,
+            r#type: value.r#type,
+        }
+    }
+}
+
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RecipeRowPartial {
     pub id: Uuid,
@@ -713,6 +722,8 @@ impl RecipePart {
 pub struct RecipePartNoname {
     pub recipe_id: Uuid,
     pub incredient_id: Uuid,
+    pub amount: i32,
+    pub unit: UnitType,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -777,6 +788,7 @@ pub struct Cabinet {
     pub name: String,
 
     pub access_key: Option<String>,
+    pub checksum: String,
 }
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize)]

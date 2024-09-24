@@ -12,7 +12,12 @@ mod authentication {
 }
 mod constants;
 
+mod cache {
+    pub mod cache;
+}
+
 pub use authentication::*;
+pub use cache::cache::*;
 pub use constants::*;
 pub use database::*;
 pub use srs::*;

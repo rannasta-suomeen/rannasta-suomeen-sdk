@@ -12,18 +12,35 @@ use crate::jwt::SessionData;
 
 use super::{get_incredient, get_product, get_user_by_id};
 
+pub async fn update_cabinet_checksum(id: i32, pool: &Pool<Postgres>) -> Result<(), potion::Error> {
+    let key = uuid::Uuid::new_v4().to_string();
+
+    sqlx::query("UPDATE cabinets SET checksum = $1 WHERE id = $2")
+        .bind(key)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
 pub async fn create_cabinet(
     name: &str,
     user_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<i32, potion::Error> {
-    let id: (i32,) =
-        sqlx::query_as("INSERT INTO cabinets (owner_id, name) VALUES ($1, $2) RETURNING *")
-            .bind(user_id)
-            .bind(name)
-            .fetch_one(pool)
-            .await
-            .map_err(|e| QueryError::from(e).into())?;
+    let key = uuid::Uuid::new_v4().to_string();
+
+    let id: (i32,) = sqlx::query_as(
+        "INSERT INTO cabinets (owner_id, name, checksum) VALUES ($1, $2, $3) RETURNING *",
+    )
+    .bind(user_id)
+    .bind(name)
+    .bind(key)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
 
     add_user_to_cabinet(id.0, user_id, &pool).await?;
 
@@ -223,6 +240,9 @@ pub async fn modify_in_cabinet(
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(id, pool).await?;
+
     Ok(())
 }
 
@@ -276,6 +296,9 @@ pub async fn modify_mixer_in_cabinet(
             .await
             .map_err(|e| QueryError::from(e).into())?;
     }
+
+    update_cabinet_checksum(id, pool).await?;
+
     Ok(())
 }
 
@@ -315,6 +338,8 @@ pub async fn add_to_cabinet(
             .into());
     }
 
+    update_cabinet_checksum(id, pool).await?;
+
     Ok(())
 }
 
@@ -351,6 +376,8 @@ pub async fn add_mixer_to_cabinet(
             .new("Mixer is already in the cabinet")
             .into());
     }
+
+    update_cabinet_checksum(id, pool).await?;
 
     Ok(())
 }
@@ -432,6 +459,8 @@ pub async fn insert_cabinet_products(
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
+    update_cabinet_checksum(cabinet_id, pool).await?;
+
     Ok(())
 }
 
@@ -453,6 +482,39 @@ pub async fn remove_from_cabinet(
             .into());
     }
 
+    update_cabinet_checksum(id, pool).await?;
+
+    Ok(())
+}
+
+pub async fn remove_mixer_from_cabinet(
+    id: i32,
+    incredient_id: i32,
+    user_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let mixer = get_cabinet_mixer_owned(id, incredient_id, user_id, pool).await?;
+    if mixer.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Mixer doesn't exists"));
+    }
+    let mixer = mixer.unwrap();
+
+    let result =
+        sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1 AND incredient_id = $2")
+            .bind(id)
+            .bind(mixer.incredient_id)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    if result.rows_affected() <= 0 {
+        return Err(HtmlError::InvalidRequest
+            .new("Product was already removed from the cabinet")
+            .into());
+    }
+
+    update_cabinet_checksum(id, pool).await?;
+
     Ok(())
 }
 
@@ -467,6 +529,8 @@ pub async fn set_product_unusable(
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(id, pool).await?;
 
     Ok(())
 }
@@ -483,6 +547,8 @@ pub async fn set_product_usable(
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
+    update_cabinet_checksum(id, pool).await?;
+
     Ok(())
 }
 
@@ -497,6 +563,8 @@ pub async fn set_cabinet_name(
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(id, pool).await?;
 
     Ok(())
 }
@@ -515,6 +583,8 @@ pub async fn set_product_amount(
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
+    update_cabinet_checksum(id, pool).await?;
+
     Ok(())
 }
 
@@ -530,6 +600,8 @@ pub async fn generate_cabinet_access_token(
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(id, pool).await?;
 
     Ok(())
 }
