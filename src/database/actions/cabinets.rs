@@ -180,6 +180,19 @@ pub async fn list_cabinet_products(
     Ok(list)
 }
 
+pub async fn list_cabinet_mixers_rsm(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Vec<CabinetMixer>, potion::Error> {
+    let list: Vec<CabinetMixer> =
+        sqlx::query_as("SELECT * FROM cabinet_mixers WHERE cabinet_id = $1 ORDER BY id")
+            .bind(id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+    Ok(list)
+}
+
 pub async fn list_cabinet_mixers(
     id: i32,
     pool: &Pool<Postgres>,
