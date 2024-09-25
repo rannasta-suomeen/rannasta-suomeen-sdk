@@ -100,11 +100,18 @@ pub async fn delete_cabinet(id: i32, pool: &Pool<Postgres>) -> Result<(), potion
         .await
         .map_err(|e| QueryError::from(e).into())?;
 
+    sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1")
+        .bind(id)
+        .execute(&mut *tr)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
     sqlx::query("DELETE FROM cabinets WHERE id = $1")
         .bind(id)
         .execute(&mut *tr)
         .await
         .map_err(|e| QueryError::from(e).into())?;
+
     tr.commit()
         .await
         .map_err(|_| QueryError::new("Could not commit transaction".to_owned()).into())?;
@@ -315,6 +322,59 @@ pub async fn modify_mixer_in_cabinet(
     Ok(())
 }
 
+pub async fn modify_mixer_in_cabinet_rsm(
+    id: i32,
+    mixer_id: i32,
+    amount: Option<i32>,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE cabinet_mixers SET amount = $1 WHERE cabinet_id = $2 AND id = $3")
+        .bind(amount)
+        .bind(id)
+        .bind(mixer_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(id, pool).await?;
+
+    Ok(())
+}
+
+/// Sets a mixer as usable. DOES NOT CHECK OWNERSHIP OR RIGHTS
+pub async fn set_mixer_usable(
+    id: i32,
+    cabinet_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE cabinet_mixers SET usable = true WHERE id = $1 AND cabinet_id = $2")
+        .bind(id)
+        .bind(cabinet_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(cabinet_id, pool).await?;
+    Ok(())
+}
+
+/// Sets a mixer as unusable. DOES NOT CHECK OWNERSHIP OR RIGHTS
+pub async fn set_mixer_unusable(
+    id: i32,
+    cabinet_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    sqlx::query("UPDATE cabinet_mixers SET usable = false WHERE id = $1 AND cabinet_id = $2")
+        .bind(id)
+        .bind(cabinet_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    update_cabinet_checksum(cabinet_id, pool).await?;
+    Ok(())
+}
+
 pub async fn add_to_cabinet(
     id: i32,
     user_id: i32,
@@ -500,6 +560,9 @@ pub async fn remove_from_cabinet(
     Ok(())
 }
 
+/// Removes a mixer that you own from a cabinet
+// TODO: Move checking for ownership somewhere else so that admins are able to modify products not
+// owned by themselves
 pub async fn remove_mixer_from_cabinet(
     id: i32,
     incredient_id: i32,
@@ -507,6 +570,37 @@ pub async fn remove_mixer_from_cabinet(
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
     let mixer = get_cabinet_mixer_owned(id, incredient_id, user_id, pool).await?;
+    if mixer.is_none() {
+        return Err(HtmlError::InvalidRequest.new("Mixer doesn't exists"));
+    }
+    let mixer = mixer.unwrap();
+
+    let result =
+        sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1 AND incredient_id = $2")
+            .bind(id)
+            .bind(mixer.incredient_id)
+            .execute(pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    if result.rows_affected() <= 0 {
+        return Err(HtmlError::InvalidRequest
+            .new("Product was already removed from the cabinet")
+            .into());
+    }
+
+    update_cabinet_checksum(id, pool).await?;
+
+    Ok(())
+}
+
+/// Removes a mixer from a cabinet DOES NOT CHECK FOR OWNERSHIP
+pub async fn remove_mixer_from_cabinet_rsm(
+    id: i32,
+    mixer_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let mixer = get_cabinet_mixer(mixer_id, pool).await?;
     if mixer.is_none() {
         return Err(HtmlError::InvalidRequest.new("Mixer doesn't exists"));
     }
