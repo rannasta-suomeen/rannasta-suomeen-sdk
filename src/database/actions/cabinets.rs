@@ -600,16 +600,11 @@ pub async fn remove_mixer_from_cabinet_rsm(
     mixer_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    let mixer = get_cabinet_mixer(mixer_id, pool).await?;
-    if mixer.is_none() {
-        return Err(HtmlError::InvalidRequest.new("Mixer doesn't exists"));
-    }
-    let mixer = mixer.unwrap();
 
     let result =
-        sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1 AND incredient_id = $2")
+        sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1 AND id = $2")
             .bind(id)
-            .bind(mixer.incredient_id)
+            .bind(mixer_id)
             .execute(pool)
             .await
             .map_err(|e| QueryError::from(e).into())?;
