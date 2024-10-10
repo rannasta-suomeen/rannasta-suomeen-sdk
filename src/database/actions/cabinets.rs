@@ -247,25 +247,6 @@ pub async fn list_cabinet_access_list(
     Ok(list)
 }
 
-pub async fn modify_in_cabinet(
-    id: i32,
-    product_id: i32,
-    amount_ml: Option<i32>,
-    pool: &Pool<Postgres>,
-) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND id = $3")
-        .bind(amount_ml)
-        .bind(id)
-        .bind(product_id)
-        .execute(pool)
-        .await
-        .map_err(|e| QueryError::from(e).into())?;
-
-    update_cabinet_checksum(id, pool).await?;
-
-    Ok(())
-}
-
 pub async fn get_cabinet_mixer(
     i_id: i32,
     pool: &Pool<Postgres>,
@@ -539,8 +520,7 @@ pub async fn remove_from_cabinet(
     product_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    let result = sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1 AND id = $2")
-        .bind(id)
+    let result = sqlx::query("DELETE FROM cabinet_products WHERE id = $1")
         .bind(product_id)
         .execute(pool)
         .await
@@ -621,8 +601,7 @@ pub async fn set_product_unusable(
     product_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_products SET usable = false WHERE cabinet_id = $1 AND id = $2")
-        .bind(id)
+    sqlx::query("UPDATE cabinet_products SET usable = false WHERE id = $1")
         .bind(product_id)
         .execute(pool)
         .await
@@ -638,8 +617,7 @@ pub async fn set_product_usable(
     product_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_products SET usable = true WHERE cabinet_id = $1 AND id = $2")
-        .bind(id)
+    sqlx::query("UPDATE cabinet_products SET usable = true WHERE id = $1")
         .bind(product_id)
         .execute(pool)
         .await
@@ -673,9 +651,8 @@ pub async fn set_product_amount(
     amount: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_products SET amount_ml = $1 WHERE cabinet_id = $2 AND id = $3")
+    sqlx::query("UPDATE cabinet_products SET amount_ml = $1 WHERE id = $2")
         .bind(amount)
-        .bind(id)
         .bind(product_id)
         .execute(pool)
         .await
@@ -740,6 +717,13 @@ pub async fn remove_user_from_cabinet(
         .map_err(|e| QueryError::from(e).into())?;
 
     sqlx::query("DELETE FROM cabinet_products WHERE cabinet_id = $1 AND owner_id = $2")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1 AND owner_id = $2")
         .bind(id)
         .bind(user_id)
         .execute(pool)
