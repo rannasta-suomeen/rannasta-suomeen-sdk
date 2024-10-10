@@ -328,9 +328,8 @@ pub async fn modify_mixer_in_cabinet_rsm(
     amount: Option<i32>,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_mixers SET amount = $1 WHERE cabinet_id = $2 AND id = $3")
+    sqlx::query("UPDATE cabinet_mixers SET amount = $1 WHERE id = $2")
         .bind(amount)
-        .bind(id)
         .bind(mixer_id)
         .execute(pool)
         .await
@@ -341,15 +340,14 @@ pub async fn modify_mixer_in_cabinet_rsm(
     Ok(())
 }
 
-/// Sets a mixer as usable. DOES NOT CHECK OWNERSHIP OR RIGHTS
+/// DOES NOT CHECK OWNERSHIP OR RIGHTS
 pub async fn set_mixer_usable(
     id: i32,
     cabinet_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_mixers SET usable = true WHERE id = $1 AND cabinet_id = $2")
+    sqlx::query("UPDATE cabinet_mixers SET usable = true WHERE id = $1")
         .bind(id)
-        .bind(cabinet_id)
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
@@ -358,15 +356,14 @@ pub async fn set_mixer_usable(
     Ok(())
 }
 
-/// Sets a mixer as unusable. DOES NOT CHECK OWNERSHIP OR RIGHTS
+/// DOES NOT CHECK OWNERSHIP OR RIGHTS
 pub async fn set_mixer_unusable(
     id: i32,
     cabinet_id: i32,
     pool: &Pool<Postgres>,
 ) -> Result<(), potion::Error> {
-    sqlx::query("UPDATE cabinet_mixers SET usable = false WHERE id = $1 AND cabinet_id = $2")
+    sqlx::query("UPDATE cabinet_mixers SET usable = false WHERE id = $1")
         .bind(id)
-        .bind(cabinet_id)
         .execute(pool)
         .await
         .map_err(|e| QueryError::from(e).into())?;
@@ -594,7 +591,7 @@ pub async fn remove_mixer_from_cabinet(
     Ok(())
 }
 
-/// Removes a mixer from a cabinet DOES NOT CHECK FOR OWNERSHIP
+/// DOES NOT CHECK FOR OWNERSHIP
 pub async fn remove_mixer_from_cabinet_rsm(
     id: i32,
     mixer_id: i32,
@@ -602,8 +599,7 @@ pub async fn remove_mixer_from_cabinet_rsm(
 ) -> Result<(), potion::Error> {
 
     let result =
-        sqlx::query("DELETE FROM cabinet_mixers WHERE cabinet_id = $1 AND id = $2")
-            .bind(id)
+        sqlx::query("DELETE FROM cabinet_mixers WHERE id = $1")
             .bind(mixer_id)
             .execute(pool)
             .await
