@@ -1,18 +1,26 @@
 use std::collections::VecDeque;
 
 use potion::TypeError;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::schema::UnitType;
 
-#[derive(Debug, Clone)]
+/*
+Standard Recipe Syntax (SRS)
+
+name            amount  unit    incredient      amount
+Sex On The Beach|2|cl|vodka|2|cl|Persikkalikööri|4|cl|Karpalomehu|8|cl|Appelsiinimehu#IBA/Experimental
+*/
+
+#[derive(Debug, Clone, Serialize)]
 pub struct StandardRecipeSyntax {
     pub name: String,
     pub parts: Vec<StandardRecipePart>,
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StandardRecipePart {
     pub amount: i32,
     pub unit: UnitType,
@@ -84,5 +92,31 @@ impl TryFrom<String> for StandardRecipeSyntax {
             parts,
             tags: recipe_tags.iter().map(|tag| tag.to_string()).collect(),
         })
+    }
+}
+
+impl Into<String> for StandardRecipeSyntax {
+    // Sex On The Beach|2|cl|vodka|2|cl|Persikkalikööri|4|cl|Karpalomehu|8|cl|Appelsiinimehu#IBA/Experimental
+    fn into(self) -> String {
+        let mut s = self.name;
+
+        self.parts.iter().for_each(|rp| {
+            s += &format!(
+                "|{}|{}|{}",
+                rp.amount,
+                rp.unit.to_string(),
+                rp.incredient_name
+            );
+        });
+
+        self.tags.iter().enumerate().for_each(|(i, tag)| {
+            if i == 0 {
+                s += &format!("#{tag}");
+            } else {
+                s += &format!("/{tag}");
+            }
+        });
+
+        s
     }
 }

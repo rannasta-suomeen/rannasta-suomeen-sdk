@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{postgres::PgRow, FromRow, Row};
 
+use crate::StandardRecipeSyntax;
+
 pub type Uuid = i32;
 
 #[derive(
@@ -532,6 +534,8 @@ pub struct Recipe {
 
     pub available_superalko: bool,
     pub available_alko: bool,
+
+    pub import_origin: Option<i32>,
 }
 
 impl FromRow<'_, PgRow> for Recipe {
@@ -569,6 +573,7 @@ impl FromRow<'_, PgRow> for Recipe {
             favorite_count: row.try_get("favorite_count")?,
             available_superalko: row.try_get("available_superalko")?,
             available_alko: row.try_get("available_alko")?,
+            import_origin: row.try_get("import_origin")?,
         })
     }
 }
@@ -867,4 +872,32 @@ pub struct LinkedRecipeTag {
     pub recipe_id: Uuid,
     pub tag_id: Uuid,
     pub tag_name: String,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct ParsedRecipeRow {
+    pub id: i32,
+    pub value: String,
+    pub added: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ParsedRecipe {
+    pub id: i32,
+    pub value: StandardRecipeSyntax,
+    pub added: bool,
+}
+
+impl TryInto<ParsedRecipe> for ParsedRecipeRow {
+    type Error = TypeError;
+
+    fn try_into(self) -> Result<ParsedRecipe, Self::Error> {
+        let srs = StandardRecipeSyntax::try_from(self.value)?;
+
+        Ok(ParsedRecipe {
+            id: self.id,
+            value: srs,
+            added: self.added,
+        })
+    }
 }

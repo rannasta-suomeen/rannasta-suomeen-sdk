@@ -39,6 +39,7 @@ CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_prod
 CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch', 'generated' );
 CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'tl', 'dash', 'kpl' );
 CREATE TYPE retailer AS ENUM ('superalko', 'alko');
+CREATE TYPE parser AS ENUM ('nettibaari', 'forms');
 
 /* Users */
 CREATE TABLE users (
@@ -98,6 +99,8 @@ CREATE TABLE drink_recipes (
 
     available_superalko BOOLEAN NOT NULL DEFAULT false,
     available_alko BOOLEAN NOT NULL DEFAULT false,
+
+    import_origin INT NULL DEFAULT NULL,
 
     FOREIGN KEY (author_id) REFERENCES users (id),
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
@@ -289,6 +292,13 @@ CREATE TABLE cabinet_mixers (
     amount INT NULL DEFAULT NULL,
 
     PRIMARY KEY (id, incredient_id, owner_id)
+);
+
+CREATE TABLE parsed_drinks (
+    id SERIAL NOT NULL,
+    value TEXT UNIQUE NOT NULL,
+    origin parser NOT NULL DEFAULT 'nettibaari',
+    added BOOLEAN NOT NULL DEFAULT false
 );
 
 /* Caches */
