@@ -371,6 +371,36 @@ pub struct Incredient {
     pub unit: UnitType,
 }
 
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
+pub struct IncredientColor {
+    pub incredient_id: Uuid,
+    pub r: i32,
+    pub g: i32,
+    pub b: i32,
+    pub a: i32,
+}
+
+impl IncredientColor {
+    pub fn as_hex(&self) -> Result<String, &Self> {
+        csscolorparser::parse(&format!("rgb({}, {}, {})", self.r, self.g, self.b))
+            .map(|color| color.to_hex_string())
+            .map_err(|_| self)
+    }
+
+    pub fn from_hex(hex: String, id: i32) -> Result<Self, String> {
+        let color = csscolorparser::parse(&hex)
+            .map(|color| color.to_rgba8())
+            .map_err(|_| hex)?;
+        Ok(Self {
+            incredient_id: id,
+            r: color[0] as i32,
+            g: color[1] as i32,
+            b: color[2] as i32,
+            a: 255,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IncredientMinimal {
     pub id: Uuid,

@@ -4,8 +4,8 @@ use crate::{
     authentication::permissions::ActionType,
     error::QueryError,
     schema::{
-        ParsedRecipe, ParsedRecipeRow, Recipe, RecipePart, RecipePartNoname, RecipeRow,
-        RecipeType, UnitType,
+        ParsedRecipe, ParsedRecipeRow, Recipe, RecipePart, RecipePartNoname, RecipeRow, RecipeType,
+        UnitType,
     },
 };
 

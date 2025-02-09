@@ -153,6 +153,16 @@ CREATE TABLE drink_incredients (
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
 );
 
+CREATE TABLE incredient_colors (
+    incredient_id SERIAL PRIMARY KEY,
+    r INT NOT NULL,
+    g INT NOT NULL,
+    b INT NOT NULL,
+    a INT NOT NULL,
+
+    FOREIGN KEY (incredient_id) REFERENCES drink_incredients (id)
+);
+
 CREATE TABLE recipe_parts (
     recipe_id SERIAL NOT NULL,
     incredient_id INTEGER NOT NULL,
@@ -183,6 +193,8 @@ CREATE TABLE subcategories (
     FOREIGN KEY (category_id) REFERENCES categories (id)
 );
 
+/* */
+
 CREATE TABLE products (
     id SERIAL NOT NULL PRIMARY KEY,
 
@@ -200,10 +212,30 @@ CREATE TABLE products (
     unit_price FLOAT GENERATED ALWAYS AS (price/volume) STORED,
     retailer retailer NOT NULL,
 
+    last_available TIMESTAMP NOT NULL DEFAULT NOW(),
+    currently_available BOOLEAN NOT NULL DEFAULT false,
+
     checksum TEXT UNIQUE NOT NULL,
 
     FOREIGN KEY (category_id) REFERENCES categories (id),
     FOREIGN KEY (subcategory_id) REFERENCES subcategories (id)
+);
+
+CREATE TABLE alko_stores (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    alko_id INT UNIQUE NOT NULL
+);
+
+CREATE TABLE alko_product_availability (
+    product_id SERIAL NOT NULL,
+    alko_store_id SERIAL NOT NULL,
+    min_stock INT NOT NULL,
+    max_stock INT NOT NULL,
+
+    FOREIGN KEY (product_id) REFERENCES products (id),
+    FOREIGN KEY (alko_store_id) REFERENCES alko_stores (id),
+    PRIMARY KEY (product_id, alko_store_id)
 );
 
 /* Incredient references */
@@ -294,12 +326,42 @@ CREATE TABLE cabinet_mixers (
     PRIMARY KEY (id, incredient_id, owner_id)
 );
 
+/* */
+
 CREATE TABLE parsed_drinks (
     id SERIAL NOT NULL,
     value TEXT UNIQUE NOT NULL,
     origin parser NOT NULL DEFAULT 'nettibaari',
     added BOOLEAN NOT NULL DEFAULT false
 );
+
+/* 
+
+CREATE TABLE drink_randomizer_queue (
+    id SERIAL PRIMARY KEY,
+    user_id SERIAL NOT NULL,
+    drink_id SERIAL NOT NULL,
+
+    multiplier FLOAT NOT NULL DEFAULT 1.0,
+    hidden BOOLEAN NOT NULL DEFAULT true
+    /* TODO paskaa */
+);
+
+CREATE TABLE drink_history (
+    id SERIAL PRIMARY KEY,
+    user_id SERIAL,
+
+    timestamp BIGINT NOT NULL,
+
+    drink_id SERIAL NULL DEFAULT NULL,
+    standard_servings FLOAT NOT NULL,
+
+    /* TODO paskaa */
+);
+
+*/
+
+
 
 /* Caches */
 CREATE TABLE global_cache (
