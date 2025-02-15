@@ -10,7 +10,7 @@ channel = "nightly"
 
 [dependencies]
 potion = { git = "https://github.com/TuuKeZu/potion-rs.git", branch = "v2" }
-#potion = { path = "../potion-rs" }
+# potion = { path = "../potion-rs" }
 warp = "0.3.7"
 serde_json = "1.0.115"
 serde = "1.0.197"

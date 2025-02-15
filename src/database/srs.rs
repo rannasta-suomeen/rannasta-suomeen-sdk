@@ -1,10 +1,11 @@
 use std::collections::VecDeque;
 
-use potion::TypeError;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::schema::UnitType;
+
+use super::error::TypeError;
 
 /*
 Standard Recipe Syntax (SRS)
@@ -28,7 +29,7 @@ pub struct StandardRecipePart {
 }
 
 impl TryFrom<String> for StandardRecipeSyntax {
-    type Error = potion::error::TypeError;
+    type Error = TypeError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let data: VecDeque<&str> = value.split("#").collect();

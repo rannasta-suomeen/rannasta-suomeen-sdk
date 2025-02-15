@@ -1,13 +1,12 @@
 use crate::{
-    error::QueryError,
-    schema::{Category, ProductOrder, SubCategory},
+    error::QueryError, pagination::PageContext, schema::{Category, ProductOrder, SubCategory}
 };
 
 use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     schema::{Product, ProductRow, RecipeAvailability},
 };
-use potion::pagination::PageContext;
+
 use sqlx::{Pool, Postgres};
 
 pub async fn get_product(id: i32, pool: &Pool<Postgres>) -> Result<Option<Product>, potion::Error> {

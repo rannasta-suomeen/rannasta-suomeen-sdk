@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 
-use potion::{pagination::PageContext, HtmlError};
+use potion::{HtmlError};
 use sqlx::{Pool, Postgres, QueryBuilder};
 
 use crate::{
-    authentication::permissions::ActionType,
-    error::QueryError,
-    schema::{
+    authentication::permissions::ActionType, error::QueryError, pagination::PageContext, schema::{
         Incredient, IncredientColor, IncredientFilterObject, ProductOrder, ProductRow, ProductType,
         RecipeAvailability, UnitType,
-    },
+    }
 };
 
 use crate::{

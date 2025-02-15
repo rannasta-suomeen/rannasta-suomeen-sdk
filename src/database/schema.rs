@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use potion::TypeError;
+use super::error::TypeError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{postgres::PgRow, Decode, FromRow, Postgres, Row};

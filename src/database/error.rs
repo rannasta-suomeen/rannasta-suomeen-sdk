@@ -1,4 +1,7 @@
-use potion::Error;
+use std::fmt::{self, Display};
+
+use potion::{Error, HtmlError};
+use warp::reject::Rejection;
 
 pub struct QueryError {
     info: String,
@@ -75,5 +78,37 @@ impl Into<Error> for CacheError {
             info: Some(self.info),
             redirect: None,
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct TypeError {
+    info: String,
+}
+
+impl TypeError {
+    pub fn new(info: &str) -> Self {
+        Self {
+            info: info.to_string(),
+        }
+    }
+}
+
+impl Into<potion::Error> for TypeError {
+    fn into(self) -> potion::Error {
+        HtmlError::InvalidRequest.new(&self.info)
+    }
+}
+
+impl Display for TypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({})", self.info)
+    }
+}
+
+impl std::error::Error for TypeError {}
+impl Into<Rejection> for TypeError {
+    fn into(self) -> Rejection {
+        HtmlError::InvalidRequest.new(&self.info).into()
     }
 }

@@ -3,6 +3,8 @@ mod database {
     pub mod error;
     pub mod schema;
     pub mod srs;
+    pub mod pagination;
+    pub mod form;
 }
 mod authentication {
     pub mod cryptography;
