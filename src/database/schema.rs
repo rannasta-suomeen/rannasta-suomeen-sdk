@@ -187,6 +187,7 @@ impl UnitType {
 pub enum Retailer {
     Superalko,
     Alko,
+    VikingLine
 }
 
 #[derive(
@@ -280,6 +281,7 @@ pub enum RecipeAvailability {
     Any,
     Alko,
     Superalko,
+    VikingLine,
 }
 
 impl TryFrom<Value> for RecipeAvailability {
@@ -291,6 +293,7 @@ impl TryFrom<Value> for RecipeAvailability {
                 "any" => Ok(Self::Any),
                 "alko" => Ok(Self::Alko),
                 "superalko" => Ok(Self::Superalko),
+                "viking_line" => Ok(Self::VikingLine),
                 _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),
@@ -988,4 +991,27 @@ impl TryInto<ParsedRecipe> for ParsedRecipeRow {
             added: self.added,
         })
     }
+}
+
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct DrinkRandomizerQueue {
+    pub id: i32,
+    pub author: Uuid,
+    pub cabinet_ref: Option<i32>,
+    pub multiplier: f32,
+    pub count: i32,
+    pub allow_duplicates: bool
+}
+
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct QueueDrink {
+    pub id: i32,
+
+    pub queue_id: i32,
+    pub recipe_id: i32,
+
+    pub revealed: bool,
+    pub revealed_by_user: Option<i32>
 }

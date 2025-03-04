@@ -335,17 +335,35 @@ CREATE TABLE parsed_drinks (
     added BOOLEAN NOT NULL DEFAULT false
 );
 
-/* 
+
+/* */
+
 
 CREATE TABLE drink_randomizer_queue (
     id SERIAL PRIMARY KEY,
-    user_id SERIAL NOT NULL,
-    drink_id SERIAL NOT NULL,
+    author SERIAL NOT NULL,
+    cabinet_ref INT NULL DEFAULT NULL,
 
     multiplier FLOAT NOT NULL DEFAULT 1.0,
-    hidden BOOLEAN NOT NULL DEFAULT true
-    /* TODO paskaa */
+    count INT NOT NULL,
+    allow_duplicates BOOLEAN NOT NULL,
+
+    FOREIGN KEY (author) REFERENCES users (id)
 );
+
+CREATE TABLE queue_drink (
+    id SERIAL PRIMARY KEY,
+    queue_id SERIAL,
+    recipe_id SERIAL,
+
+    revealed BOOLEAN DEFAULT false,
+    revealed_by_user INT NULL DEFAULT NULL,
+
+    FOREIGN KEY (queue_id) REFERENCES drink_randomizer_queue (id),
+    FOREIGN KEY (recipe_id) REFERENCES drink_recipes (id)
+);
+
+/*
 
 CREATE TABLE drink_history (
     id SERIAL PRIMARY KEY,
