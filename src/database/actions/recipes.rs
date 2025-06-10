@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    authentication::permissions::ActionType, error::QueryError, pagination::PageContext, schema::{
+    authentication::permissions::ActionType,
+    error::QueryError,
+    pagination::PageContext,
+    schema::{
         ParsedRecipe, ParsedRecipeRow, Recipe, RecipePart, RecipePartNoname, RecipeRow, RecipeType,
         UnitType,
-    }
+    },
 };
 
 use crate::{
@@ -16,7 +19,7 @@ use crate::{
     },
     RECIPE_COUNT_PER_PAGE,
 };
-use potion::{HtmlError};
+use potion::HtmlError;
 use sqlx::{Pool, Postgres};
 
 pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {

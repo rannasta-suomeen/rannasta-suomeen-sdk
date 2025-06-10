@@ -1,11 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
-
 use potion::Error;
 use serde_json::Value;
 
 use super::error::TypeError;
-
 
 pub type FormData = HashMap<String, Value>;
 

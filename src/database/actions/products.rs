@@ -1,5 +1,7 @@
 use crate::{
-    error::QueryError, pagination::PageContext, schema::{Category, ProductOrder, SubCategory}
+    error::QueryError,
+    pagination::PageContext,
+    schema::{Category, ProductOrder, SubCategory},
 };
 
 use crate::{
@@ -118,7 +120,7 @@ pub async fn fetch_products(
             RecipeAvailability::Any => "",
             RecipeAvailability::Alko => "AND p.retailer = 'alko'",
             RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
-            RecipeAvailability::VikingLine => "AND p.retailer = 'viking_line'"
+            RecipeAvailability::VikingLine => "AND p.retailer = 'viking_line'",
         })
         .unwrap_or("");
 

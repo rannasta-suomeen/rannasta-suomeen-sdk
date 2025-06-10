@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, NaiveDateTime, Utc};
 use super::error::TypeError;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{postgres::PgRow, Decode, FromRow, Postgres, Row};
@@ -187,7 +187,7 @@ impl UnitType {
 pub enum Retailer {
     Superalko,
     Alko,
-    VikingLine
+    VikingLine,
 }
 
 #[derive(
@@ -485,7 +485,6 @@ pub struct Product {
     pub retailer: Retailer,
 }
 
-
 impl<'r> FromRow<'r, PgRow> for Product {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         Ok(Self {
@@ -498,7 +497,9 @@ impl<'r> FromRow<'r, PgRow> for Product {
             category_id: row.try_get("category_id")?,
             subcategory_id: row.try_get("subcategory_id")?,
             currently_available: row.try_get("currently_available")?,
-            last_available: row.try_get("last_available").map(|v: NaiveDateTime| v.and_utc())?,
+            last_available: row
+                .try_get("last_available")
+                .map(|v: NaiveDateTime| v.and_utc())?,
             abv: row.try_get("abv")?,
             aer: row.try_get("aer")?,
             unit_price: row.try_get("unit_price")?,
@@ -507,7 +508,6 @@ impl<'r> FromRow<'r, PgRow> for Product {
         })
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductRow {
@@ -540,16 +540,17 @@ impl<'r> FromRow<'r, PgRow> for ProductRow {
             img: row.try_get("img")?,
             volume: row.try_get("volume")?,
             currently_available: row.try_get("currently_available")?,
-            last_available: row.try_get("last_available").map(|v: NaiveDateTime| v.and_utc())?,
+            last_available: row
+                .try_get("last_available")
+                .map(|v: NaiveDateTime| v.and_utc())?,
             abv: row.try_get("abv")?,
             aer: row.try_get("aer")?,
             unit_price: row.try_get("unit_price")?,
             retailer: row.try_get("retailer")?,
-            count: row.try_get("count")?
+            count: row.try_get("count")?,
         })
     }
 }
-
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct IncredientFilterObject {
@@ -993,7 +994,6 @@ impl TryInto<ParsedRecipe> for ParsedRecipeRow {
     }
 }
 
-
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct DrinkRandomizerQueue {
     pub id: i32,
@@ -1001,9 +1001,8 @@ pub struct DrinkRandomizerQueue {
     pub cabinet_ref: Option<i32>,
     pub multiplier: f32,
     pub count: i32,
-    pub allow_duplicates: bool
+    pub allow_duplicates: bool,
 }
-
 
 #[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct QueueDrink {
@@ -1013,5 +1012,11 @@ pub struct QueueDrink {
     pub recipe_id: i32,
 
     pub revealed: bool,
-    pub revealed_by_user: Option<i32>
+    pub revealed_by_user: Option<i32>,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct ProductPriceHistoryEntry {
+    pub product_id: i32,
+    pub price: f64,
 }

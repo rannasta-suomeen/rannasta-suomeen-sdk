@@ -369,8 +369,6 @@ CREATE TABLE drink_history (
     id SERIAL PRIMARY KEY,
     user_id SERIAL,
 
-    timestamp BIGINT NOT NULL,
-
     drink_id SERIAL NULL DEFAULT NULL,
     standard_servings FLOAT NOT NULL,
 
@@ -379,6 +377,28 @@ CREATE TABLE drink_history (
 
 */
 
+/* Price tracking */
+
+CREATE table product_price_history (
+    product_id SERIAL NOT NULL,
+    price FLOAT NOT NULL,
+    last_timestamp TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc'),
+    initial_timestamp TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc'),
+
+    FOREIGN KEY (product_id) REFERENCES products (id),
+    PRIMARY KEY (product_id, initial_timestamp)
+);
+
+/* Similarity tracking */
+
+CREATE TABLE similar_products (
+    product SERIAL,
+    product_similar SERIAL,
+
+    FOREIGN KEY (product) REFERENCES products (id),
+    FOREIGN KEY (product_similar) REFERENCES products (id),
+    PRIMARY KEY (product, product_similar)
+);
 
 
 /* Caches */
