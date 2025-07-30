@@ -70,6 +70,7 @@ pub async fn fetch_recipes(
             RecipeAvailability::Any => "",
             RecipeAvailability::Alko => "AND r.available_alko",
             RecipeAvailability::Superalko => "AND r.available_superalko",
+            // TODO see #39
             RecipeAvailability::VikingLine => "",
         })
         .unwrap_or("");

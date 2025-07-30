@@ -1,3 +1,4 @@
+// Currently disabled, we can revisit this in #40
 use crate::schema::Product;
 use std::collections::HashSet;
 
