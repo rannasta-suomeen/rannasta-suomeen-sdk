@@ -921,6 +921,7 @@ pub struct CabinetMixer {
     pub name: String,
     pub unit: UnitType,
 
+    pub usable: bool,
     pub amount: Option<i32>,
 }
 
