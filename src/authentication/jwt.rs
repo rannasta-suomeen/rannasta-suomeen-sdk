@@ -16,7 +16,7 @@ use crate::schema::UserRole;
 
 use super::permissions::ActionType;
 
-pub const JWT_PRIVATE_KEY: OnceLock<&str> = OnceLock::new();
+pub static JWT_PRIVATE_KEY: OnceLock<&str> = OnceLock::new();
 
 /// This should be alsways initialized with dotenv
 pub fn initialize_jwt_private_key(key: &'static str) -> Result<(), Box<dyn std::error::Error>> {
