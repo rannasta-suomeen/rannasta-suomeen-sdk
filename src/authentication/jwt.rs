@@ -20,12 +20,17 @@ pub const JWT_PRIVATE_KEY: OnceLock<&str> = OnceLock::new();
 
 /// This should be alsways initialized with dotenv
 pub fn initialize_jwt_private_key(key: &'static str) -> Result<(), Box<dyn std::error::Error>> {
-    JWT_PRIVATE_KEY.set(key).map_err(|_| "Tried to re-initialize JWT_PRIVATE_KEY")?;
+    JWT_PRIVATE_KEY
+        .set(key)
+        .map_err(|_| "Tried to re-initialize JWT_PRIVATE_KEY")?;
     Ok(())
 }
 
 fn _private_key() -> &'static [u8] {
-    JWT_PRIVATE_KEY.get().expect("JWT_PRIVATE_KEY has not been initialized").as_bytes()
+    JWT_PRIVATE_KEY
+        .get()
+        .expect("JWT_PRIVATE_KEY has not been initialized")
+        .as_bytes()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
