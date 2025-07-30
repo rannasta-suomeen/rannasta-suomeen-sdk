@@ -15,4 +15,5 @@ pub use queues::*;
 pub use recipes::*;
 pub use tags::*;
 pub use users::*;
-pub mod similarity;
+// Remove this for now (#39)
+// pub mod similarity;
