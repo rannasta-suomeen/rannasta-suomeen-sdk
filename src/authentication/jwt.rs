@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use chrono::Duration;
 use chrono::Local;
 use hmac::{Hmac, Mac};
@@ -13,6 +15,18 @@ use crate::schema::Cabinet;
 use crate::schema::UserRole;
 
 use super::permissions::ActionType;
+
+pub const JWT_PRIVATE_KEY: OnceLock<&str> = OnceLock::new();
+
+/// This should be alsways initialized with dotenv
+pub fn initialize_jwt_private_key(key: &'static str) -> Result<(), Box<dyn std::error::Error>> {
+    JWT_PRIVATE_KEY.set(key).map_err(|_| "Tried to re-initialize JWT_PRIVATE_KEY")?;
+    Ok(())
+}
+
+fn _private_key() -> &'static [u8] {
+    JWT_PRIVATE_KEY.get().expect("JWT_PRIVATE_KEY has not been initialized").as_bytes()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JwtSessionData {
@@ -79,14 +93,14 @@ pub struct CabinetRecipeAccessKey {
 }
 
 pub fn generate_jwt_session(user: &User) -> String {
-    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
+    let key: Hmac<Sha256> = Hmac::new_from_slice(_private_key()).unwrap();
     let claims = JwtSessionData::new(user.id, user.username.to_owned(), user.uid.to_owned());
 
     claims.sign_with_key(&key).unwrap()
 }
 
 pub fn generate_cabinet_access_key(cabinet: &Cabinet) -> String {
-    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
+    let key: Hmac<Sha256> = Hmac::new_from_slice(_private_key()).unwrap();
     let claims = CabinetRecipeAccessKey {
         cabinet_id: cabinet.id,
         cabinet_name: cabinet.name.clone(),
@@ -97,7 +111,7 @@ pub fn generate_cabinet_access_key(cabinet: &Cabinet) -> String {
 }
 
 pub fn verify_jwt_session(token: String) -> Result<JwtSessionData, potion::Error> {
-    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
+    let key: Hmac<Sha256> = Hmac::new_from_slice(_private_key()).unwrap();
 
     token
         .verify_with_key(&key)
@@ -113,7 +127,7 @@ pub fn verify_jwt_session(token: String) -> Result<JwtSessionData, potion::Error
 }
 
 pub fn parse_cabinet_access_key(token: String) -> Result<CabinetRecipeAccessKey, potion::Error> {
-    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret").unwrap();
+    let key: Hmac<Sha256> = Hmac::new_from_slice(_private_key()).unwrap();
 
     token
         .verify_with_key(&key)

@@ -24,6 +24,7 @@ uuid = { version = "1.10.0", features = ["v4"] }
 csscolorparser = "0.7.0"
 redis-macros = "0.4.0"
 log = "0.4.22"
+dotenv = "0.15.0"
 # Remove for now (#34)
 # strsim = "0.11.1"
 # ngram = "0.1.13"
