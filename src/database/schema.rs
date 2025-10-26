@@ -1,9 +1,14 @@
 use std::collections::BTreeMap;
 
-use potion::TypeError;
+use super::error::TypeError;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{postgres::PgRow, FromRow, Row};
+use sqlx::{postgres::PgRow, Decode, FromRow, Postgres, Row};
+
+use chrono::serde::ts_seconds;
+
+use crate::StandardRecipeSyntax;
 
 pub type Uuid = i32;
 
@@ -182,6 +187,7 @@ impl UnitType {
 pub enum Retailer {
     Superalko,
     Alko,
+    VikingLine,
 }
 
 #[derive(
@@ -275,6 +281,7 @@ pub enum RecipeAvailability {
     Any,
     Alko,
     Superalko,
+    VikingLine,
 }
 
 impl TryFrom<Value> for RecipeAvailability {
@@ -286,6 +293,7 @@ impl TryFrom<Value> for RecipeAvailability {
                 "any" => Ok(Self::Any),
                 "alko" => Ok(Self::Alko),
                 "superalko" => Ok(Self::Superalko),
+                "viking_line" => Ok(Self::VikingLine),
                 _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),
@@ -369,6 +377,36 @@ pub struct Incredient {
     pub unit: UnitType,
 }
 
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
+pub struct IncredientColor {
+    pub incredient_id: Uuid,
+    pub r: i32,
+    pub g: i32,
+    pub b: i32,
+    pub a: i32,
+}
+
+impl IncredientColor {
+    pub fn as_hex(&self) -> Result<String, &Self> {
+        csscolorparser::parse(&format!("rgb({}, {}, {})", self.r, self.g, self.b))
+            .map(|color| color.to_hex_string())
+            .map_err(|_| self)
+    }
+
+    pub fn from_hex(hex: String, id: i32) -> Result<Self, String> {
+        let color = csscolorparser::parse(&hex)
+            .map(|color| color.to_rgba8())
+            .map_err(|_| hex)?;
+        Ok(Self {
+            incredient_id: id,
+            r: color[0] as i32,
+            g: color[1] as i32,
+            b: color[2] as i32,
+            a: 255,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IncredientMinimal {
     pub id: Uuid,
@@ -423,7 +461,7 @@ pub struct SubCategory {
     pub product_count: i32,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
     pub id: Uuid,
     pub name: String,
@@ -434,6 +472,11 @@ pub struct Product {
     pub category_id: Uuid,
     pub subcategory_id: Uuid,
 
+    pub currently_available: bool,
+
+    #[serde(with = "ts_seconds")]
+    pub last_available: DateTime<Utc>,
+
     pub abv: f64,
     pub aer: f64,
     pub unit_price: f64,
@@ -442,7 +485,31 @@ pub struct Product {
     pub retailer: Retailer,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
+impl<'r> FromRow<'r, PgRow> for Product {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            href: row.try_get("href")?,
+            price: row.try_get("price")?,
+            img: row.try_get("img")?,
+            volume: row.try_get("volume")?,
+            category_id: row.try_get("category_id")?,
+            subcategory_id: row.try_get("subcategory_id")?,
+            currently_available: row.try_get("currently_available")?,
+            last_available: row
+                .try_get("last_available")
+                .map(|v: NaiveDateTime| v.and_utc())?,
+            abv: row.try_get("abv")?,
+            aer: row.try_get("aer")?,
+            unit_price: row.try_get("unit_price")?,
+            checksum: row.try_get("checksum")?,
+            retailer: row.try_get("retailer")?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductRow {
     pub id: Uuid,
     pub name: String,
@@ -455,7 +522,34 @@ pub struct ProductRow {
     pub volume: f64,
     pub aer: f64,
 
+    pub currently_available: bool,
+
+    #[serde(with = "ts_seconds")]
+    pub last_available: DateTime<Utc>,
+
     pub count: i64,
+}
+
+impl<'r> FromRow<'r, PgRow> for ProductRow {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            href: row.try_get("href")?,
+            price: row.try_get("price")?,
+            img: row.try_get("img")?,
+            volume: row.try_get("volume")?,
+            currently_available: row.try_get("currently_available")?,
+            last_available: row
+                .try_get("last_available")
+                .map(|v: NaiveDateTime| v.and_utc())?,
+            abv: row.try_get("abv")?,
+            aer: row.try_get("aer")?,
+            unit_price: row.try_get("unit_price")?,
+            retailer: row.try_get("retailer")?,
+            count: row.try_get("count")?,
+        })
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize)]
@@ -532,6 +626,8 @@ pub struct Recipe {
 
     pub available_superalko: bool,
     pub available_alko: bool,
+
+    pub import_origin: Option<i32>,
 }
 
 impl FromRow<'_, PgRow> for Recipe {
@@ -569,6 +665,7 @@ impl FromRow<'_, PgRow> for Recipe {
             favorite_count: row.try_get("favorite_count")?,
             available_superalko: row.try_get("available_superalko")?,
             available_alko: row.try_get("available_alko")?,
+            import_origin: row.try_get("import_origin")?,
         })
     }
 }
@@ -868,4 +965,59 @@ pub struct LinkedRecipeTag {
     pub recipe_id: Uuid,
     pub tag_id: Uuid,
     pub tag_name: String,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct ParsedRecipeRow {
+    pub id: i32,
+    pub value: String,
+    pub added: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ParsedRecipe {
+    pub id: i32,
+    pub value: StandardRecipeSyntax,
+    pub added: bool,
+}
+
+impl TryInto<ParsedRecipe> for ParsedRecipeRow {
+    type Error = TypeError;
+
+    fn try_into(self) -> Result<ParsedRecipe, Self::Error> {
+        let srs = StandardRecipeSyntax::try_from(self.value)?;
+
+        Ok(ParsedRecipe {
+            id: self.id,
+            value: srs,
+            added: self.added,
+        })
+    }
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct DrinkRandomizerQueue {
+    pub id: i32,
+    pub author: Uuid,
+    pub cabinet_ref: Option<i32>,
+    pub multiplier: f32,
+    pub count: i32,
+    pub allow_duplicates: bool,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct QueueDrink {
+    pub id: i32,
+
+    pub queue_id: i32,
+    pub recipe_id: i32,
+
+    pub revealed: bool,
+    pub revealed_by_user: Option<i32>,
+}
+
+#[derive(sqlx::FromRow, Debug, Default, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct ProductPriceHistoryEntry {
+    pub product_id: i32,
+    pub price: f64,
 }

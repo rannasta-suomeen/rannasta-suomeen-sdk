@@ -58,9 +58,10 @@ pub const RECIPE_AVAILABILITIES: &[(&str, &str)] = &[
 ];
 
 pub const PRODUCT_AVAILABILITIES: &[(&str, &str)] = &[
-    ("any", "Either"),
+    ("any", "Any"),
     ("alko", "Alko"),
     ("superalko", "Superalko"),
+    ("viking_line", "Viking Line"),
 ];
 
 pub const UNITS: &[&str] = &["cl", "ml", "oz", "kpl"];

@@ -1,5 +1,6 @@
 use crate::{
     error::QueryError,
+    pagination::PageContext,
     schema::{Category, ProductOrder, SubCategory},
 };
 
@@ -7,7 +8,7 @@ use crate::{
     constants::PRODUCT_COUNT_PER_PAGE,
     schema::{Product, ProductRow, RecipeAvailability},
 };
-use potion::pagination::PageContext;
+
 use sqlx::{Pool, Postgres};
 
 pub async fn get_product(id: i32, pool: &Pool<Postgres>) -> Result<Option<Product>, potion::Error> {
@@ -119,13 +120,14 @@ pub async fn fetch_products(
             RecipeAvailability::Any => "",
             RecipeAvailability::Alko => "AND p.retailer = 'alko'",
             RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
+            RecipeAvailability::VikingLine => "AND p.retailer = 'viking_line'",
         })
         .unwrap_or("");
 
     let rows: Vec<ProductRow> = match (category_id, sub_category) {
         (Some(category_id), Some(subcategory_id)) => {
             sqlx::query_as(&format!("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 {} ORDER BY {} LIMIT $4 OFFSET $5
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.last_available, p.currently_available, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.subcategory_id = $2 AND p.name ILIKE $3 {} ORDER BY {} LIMIT $4 OFFSET $5
             ", availability, order))
                 .bind(category_id)
                 .bind(subcategory_id)
@@ -136,7 +138,7 @@ pub async fn fetch_products(
         },
         (Some(category_id), None) => {
             sqlx::query_as(&format!("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 {} ORDER BY {} LIMIT $3 OFFSET $4
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.last_available, p.currently_available, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.category_id = $1 AND p.name ILIKE $2 {} ORDER BY {} LIMIT $3 OFFSET $4
             ", availability, order))
                 .bind(category_id)
                 .bind(search)
@@ -146,7 +148,7 @@ pub async fn fetch_products(
         },
         (None, Some(subcategory_id)) => {
             sqlx::query_as(&format!("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 {} ORDER BY {} LIMIT $3 OFFSET $4
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.last_available, p.currently_available, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.subcategory_id = $1 AND p.name ILIKE $2 {} ORDER BY {} LIMIT $3 OFFSET $4
             ", availability, order))
                 .bind(subcategory_id)
                 .bind(search)
@@ -156,7 +158,7 @@ pub async fn fetch_products(
         },
         (None, None) => {
             sqlx::query_as(&format!("
-                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 {} ORDER BY {} LIMIT $2 OFFSET $3
+                SELECT p.id, p.name, p.href, p.img, p.retailer, p.unit_price, p.price, p.abv, p.volume, p.last_available, p.currently_available, p.aer, COUNT(pp) OVER() FROM products p LEFT JOIN products pp ON pp.id = p.id WHERE p.name ILIKE $1 {} ORDER BY {} LIMIT $2 OFFSET $3
             ", availability, order))
                 .bind(search)
                 .bind(PRODUCT_COUNT_PER_PAGE)

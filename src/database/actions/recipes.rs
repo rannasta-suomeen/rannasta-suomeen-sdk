@@ -3,7 +3,11 @@ use std::collections::HashMap;
 use crate::{
     authentication::permissions::ActionType,
     error::QueryError,
-    schema::{Recipe, RecipePart, RecipePartNoname, RecipeRow, RecipeType, UnitType},
+    pagination::PageContext,
+    schema::{
+        ParsedRecipe, ParsedRecipeRow, Recipe, RecipePart, RecipePartNoname, RecipeRow, RecipeType,
+        UnitType,
+    },
 };
 
 use crate::{
@@ -15,7 +19,7 @@ use crate::{
     },
     RECIPE_COUNT_PER_PAGE,
 };
-use potion::{pagination::PageContext, HtmlError};
+use potion::HtmlError;
 use sqlx::{Pool, Postgres};
 
 pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::Error> {
@@ -25,6 +29,31 @@ pub async fn list_recipes(pool: &Pool<Postgres>) -> Result<Vec<Recipe>, potion::
         .map_err(|e| QueryError::from(e).into())?;
 
     Ok(rows)
+}
+
+pub async fn generate_parsed_recipe(
+    pool: &Pool<Postgres>,
+) -> Result<Option<ParsedRecipe>, potion::Error> {
+    let row: Option<ParsedRecipeRow> =
+        sqlx::query_as("SELECT * FROM parsed_drinks WHERE NOT added ORDER BY RANDOM() LIMIT 1")
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|r| r.try_into().ok()).flatten())
+}
+
+pub async fn fetch_parsed_recipe(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Option<ParsedRecipe>, potion::Error> {
+    let row: Option<ParsedRecipeRow> = sqlx::query_as("SELECT * FROM parsed_drinks WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row.map(|r| r.try_into().ok()).flatten())
 }
 
 pub async fn fetch_recipes(
@@ -41,6 +70,8 @@ pub async fn fetch_recipes(
             RecipeAvailability::Any => "",
             RecipeAvailability::Alko => "AND r.available_alko",
             RecipeAvailability::Superalko => "AND r.available_superalko",
+            // TODO see #39
+            RecipeAvailability::VikingLine => "",
         })
         .unwrap_or("");
 
@@ -105,14 +136,14 @@ pub async fn fetch_recipes(
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (None, None) => {
-            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.name ILIKE $1 {availability} ORDER BY {order} LIMIT $2 OFFSET $3"))
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type != 'generated' AND r.name ILIKE $1 {availability} ORDER BY {order} LIMIT $2 OFFSET $3"))
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
                 .bind(offset)
                 .fetch_all(&*pool).await.map_err(|e| QueryError::from(e).into())?
         },
         (Some(category), None) => {
-            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id WHERE r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
+            sqlx::query_as(&format!("SELECT r.*, COUNT(rr) OVER() FROM drink_recipes r LEFT JOIN drink_recipes rr ON rr.id = r.id r.type = $1 AND r.name ILIKE $2 {availability} ORDER BY {order} LIMIT $3 OFFSET $4"))
                 .bind(category)
                 .bind(search)
                 .bind(RECIPE_COUNT_PER_PAGE)
@@ -254,6 +285,57 @@ pub async fn create_recipe(
     .bind(user_id)
     .bind(name)
     .bind(recipe_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(id.0)
+}
+
+pub async fn skip_parsed_recipe(
+    parsed_id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<(), potion::Error> {
+    let _query = sqlx::query("DELETE FROM parsed_drinks WHERE id = $1")
+        .bind(parsed_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(())
+}
+
+pub async fn import_parsed_recipe(
+    parsed_id: i32,
+    user_id: i32,
+    name: String,
+    pool: &Pool<Postgres>,
+) -> Result<i32, potion::Error> {
+    let _update = sqlx::query("UPDATE parsed_drinks SET added = true WHERE id = $1")
+        .bind(parsed_id)
+        .execute(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    let recipe: (i32,) = sqlx::query_as("INSERT INTO recipes DEFAULT VALUES RETURNING id")
+        .fetch_one(pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?;
+
+    let recipe_id = recipe.0;
+
+    let id: (i32,) = sqlx::query_as(
+        "
+        INSERT INTO drink_recipes (type, author_id, name, recipe_id, import_origin)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+    ",
+    )
+    .bind(RecipeType::Generated)
+    .bind(user_id)
+    .bind(name)
+    .bind(recipe_id)
+    .bind(parsed_id)
     .fetch_one(pool)
     .await
     .map_err(|e| QueryError::from(e).into())?;

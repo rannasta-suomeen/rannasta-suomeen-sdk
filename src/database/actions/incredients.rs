@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
-use potion::{pagination::PageContext, HtmlError};
+use potion::HtmlError;
 use sqlx::{Pool, Postgres, QueryBuilder};
 
 use crate::{
     authentication::permissions::ActionType,
     error::QueryError,
+    pagination::PageContext,
     schema::{
-        Incredient, IncredientFilterObject, ProductOrder, ProductRow, ProductType,
+        Incredient, IncredientColor, IncredientFilterObject, ProductOrder, ProductRow, ProductType,
         RecipeAvailability, UnitType,
     },
 };
@@ -163,6 +164,56 @@ pub async fn find_incredient(
     Ok(row.map(|r| r.0))
 }
 
+pub async fn get_incredient_color(
+    id: i32,
+    pool: &Pool<Postgres>,
+) -> Result<Option<IncredientColor>, potion::Error> {
+    let row: Option<IncredientColor> =
+        sqlx::query_as("SELECT * FROM incredient_colors WHERE incredient_id = $1")
+            .bind(id)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| QueryError::from(e).into())?;
+
+    Ok(row)
+}
+
+pub async fn set_incredient_color(
+    id: i32,
+    pool: &Pool<Postgres>,
+    r: i32,
+    g: i32,
+    b: i32,
+    a: i32,
+) -> Result<(), potion::Error> {
+    let _query = match get_incredient_color(id, pool).await? {
+        Some(_color) => sqlx::query(
+            "UPDATE incredient_colors SET r = $1, g = $2, b = $3, a = $4 WHERE incredient_id = $5",
+        )
+        .bind(r)
+        .bind(g)
+        .bind(b)
+        .bind(a)
+        .bind(id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?,
+        None => sqlx::query(
+            "INSERT INTO incredient_colors (incredient_id, r, g, b, a) VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(id)
+        .bind(r)
+        .bind(g)
+        .bind(b)
+        .bind(a)
+        .execute(&*pool)
+        .await
+        .map_err(|e| QueryError::from(e).into())?,
+    };
+
+    Ok(())
+}
+
 pub async fn get_incredient(
     id: i32,
     pool: &Pool<Postgres>,
@@ -296,6 +347,7 @@ pub async fn fetch_product_filter(
             RecipeAvailability::Any => "",
             RecipeAvailability::Alko => "AND p.retailer = 'alko'",
             RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
+            RecipeAvailability::VikingLine => "AND p.retailer = 'viking_line'",
         })
         .unwrap_or("");
 

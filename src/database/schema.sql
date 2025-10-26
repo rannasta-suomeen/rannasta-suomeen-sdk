@@ -39,6 +39,7 @@ CREATE TYPE product_type AS ENUM ( 'light_alcohol_product', 'strong_alcohol_prod
 CREATE TYPE drink_type AS ENUM ( 'cocktail', 'shot', 'punch', 'generated' );
 CREATE TYPE unit_type AS ENUM ( 'oz', 'cl', 'ml', 'tl', 'dash', 'kpl' );
 CREATE TYPE retailer AS ENUM ('superalko', 'alko');
+CREATE TYPE parser AS ENUM ('nettibaari', 'forms');
 
 /* Users */
 CREATE TABLE users (
@@ -99,6 +100,8 @@ CREATE TABLE drink_recipes (
     available_superalko BOOLEAN NOT NULL DEFAULT false,
     available_alko BOOLEAN NOT NULL DEFAULT false,
 
+    import_origin INT NULL DEFAULT NULL,
+
     FOREIGN KEY (author_id) REFERENCES users (id),
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
 );
@@ -150,6 +153,16 @@ CREATE TABLE drink_incredients (
     FOREIGN KEY (recipe_id) REFERENCES recipes (id)
 );
 
+CREATE TABLE incredient_colors (
+    incredient_id SERIAL PRIMARY KEY,
+    r INT NOT NULL,
+    g INT NOT NULL,
+    b INT NOT NULL,
+    a INT NOT NULL,
+
+    FOREIGN KEY (incredient_id) REFERENCES drink_incredients (id)
+);
+
 CREATE TABLE recipe_parts (
     recipe_id SERIAL NOT NULL,
     incredient_id INTEGER NOT NULL,
@@ -180,6 +193,8 @@ CREATE TABLE subcategories (
     FOREIGN KEY (category_id) REFERENCES categories (id)
 );
 
+/* */
+
 CREATE TABLE products (
     id SERIAL NOT NULL PRIMARY KEY,
 
@@ -197,10 +212,30 @@ CREATE TABLE products (
     unit_price FLOAT GENERATED ALWAYS AS (price/volume) STORED,
     retailer retailer NOT NULL,
 
+    last_available TIMESTAMP NOT NULL DEFAULT NOW(),
+    currently_available BOOLEAN NOT NULL DEFAULT false,
+
     checksum TEXT UNIQUE NOT NULL,
 
     FOREIGN KEY (category_id) REFERENCES categories (id),
     FOREIGN KEY (subcategory_id) REFERENCES subcategories (id)
+);
+
+CREATE TABLE alko_stores (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    alko_id INT UNIQUE NOT NULL
+);
+
+CREATE TABLE alko_product_availability (
+    product_id SERIAL NOT NULL,
+    alko_store_id SERIAL NOT NULL,
+    min_stock INT NOT NULL,
+    max_stock INT NOT NULL,
+
+    FOREIGN KEY (product_id) REFERENCES products (id),
+    FOREIGN KEY (alko_store_id) REFERENCES alko_stores (id),
+    PRIMARY KEY (product_id, alko_store_id)
 );
 
 /* Incredient references */
@@ -290,6 +325,81 @@ CREATE TABLE cabinet_mixers (
 
     PRIMARY KEY (id, incredient_id, owner_id)
 );
+
+/* */
+
+CREATE TABLE parsed_drinks (
+    id SERIAL NOT NULL,
+    value TEXT UNIQUE NOT NULL,
+    origin parser NOT NULL DEFAULT 'nettibaari',
+    added BOOLEAN NOT NULL DEFAULT false
+);
+
+
+/* */
+
+
+CREATE TABLE drink_randomizer_queue (
+    id SERIAL PRIMARY KEY,
+    author SERIAL NOT NULL,
+    cabinet_ref INT NULL DEFAULT NULL,
+
+    multiplier FLOAT NOT NULL DEFAULT 1.0,
+    count INT NOT NULL,
+    allow_duplicates BOOLEAN NOT NULL,
+
+    FOREIGN KEY (author) REFERENCES users (id)
+);
+
+CREATE TABLE queue_drink (
+    id SERIAL PRIMARY KEY,
+    queue_id SERIAL,
+    recipe_id SERIAL,
+
+    revealed BOOLEAN DEFAULT false,
+    revealed_by_user INT NULL DEFAULT NULL,
+
+    FOREIGN KEY (queue_id) REFERENCES drink_randomizer_queue (id),
+    FOREIGN KEY (recipe_id) REFERENCES drink_recipes (id)
+);
+
+/*
+
+CREATE TABLE drink_history (
+    id SERIAL PRIMARY KEY,
+    user_id SERIAL,
+
+    drink_id SERIAL NULL DEFAULT NULL,
+    standard_servings FLOAT NOT NULL,
+
+    /* TODO paskaa */
+);
+
+*/
+
+/* Price tracking */
+
+CREATE table product_price_history (
+    product_id SERIAL NOT NULL,
+    price FLOAT NOT NULL,
+    last_timestamp TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc'),
+    initial_timestamp TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc'),
+
+    FOREIGN KEY (product_id) REFERENCES products (id),
+    PRIMARY KEY (product_id, initial_timestamp)
+);
+
+/* Similarity tracking */
+
+CREATE TABLE similar_products (
+    product SERIAL,
+    product_similar SERIAL,
+
+    FOREIGN KEY (product) REFERENCES products (id),
+    FOREIGN KEY (product_similar) REFERENCES products (id),
+    PRIMARY KEY (product, product_similar)
+);
+
 
 /* Caches */
 CREATE TABLE global_cache (
