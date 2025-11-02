@@ -4,7 +4,7 @@ use super::error::TypeError;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{postgres::PgRow, Decode, FromRow, Postgres, Row};
+use sqlx::{postgres::PgRow, FromRow, Row};
 
 use chrono::serde::ts_seconds;
 
@@ -185,8 +185,8 @@ impl UnitType {
 #[sqlx(type_name = "retailer", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum Retailer {
-    Superalko,
     Alko,
+    Superalko,
     VikingLine,
 }
 
@@ -1020,4 +1020,18 @@ pub struct QueueDrink {
 pub struct ProductPriceHistoryEntry {
     pub product_id: i32,
     pub price: f64,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct ProductBestDealEntry {
+    pub name: String,
+    pub category: String,
+    pub retailer: Retailer,
+    pub id: i32,
+    pub href: String,
+    pub price: f64,
+    pub unit_price: f64,
+    pub abv: f64,
+    pub aer: f64,
+    pub volume: f64,
 }
