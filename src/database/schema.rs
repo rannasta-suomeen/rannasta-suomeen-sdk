@@ -283,6 +283,7 @@ pub enum RecipeAvailability {
     Alko,
     Superalko,
     VikingLine,
+    TallinkSilja
 }
 
 impl TryFrom<Value> for RecipeAvailability {
@@ -295,6 +296,7 @@ impl TryFrom<Value> for RecipeAvailability {
                 "alko" => Ok(Self::Alko),
                 "superalko" => Ok(Self::Superalko),
                 "viking_line" => Ok(Self::VikingLine),
+                "tallink_silja" => Ok(Self::TallinkSilja),
                 _ => Err(TypeError::new("Invalid variant")),
             },
             None => return Err(TypeError::new("Failed to parse value as string")),

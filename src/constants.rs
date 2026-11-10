@@ -62,6 +62,7 @@ pub const PRODUCT_AVAILABILITIES: &[(&str, &str)] = &[
     ("alko", "Alko"),
     ("superalko", "Superalko"),
     ("viking_line", "Viking Line"),
+    ("tallink_silja", "Tallink Silja")
 ];
 
 pub const UNITS: &[&str] = &["cl", "ml", "oz", "kpl"];

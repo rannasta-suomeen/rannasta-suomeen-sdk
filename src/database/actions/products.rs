@@ -121,6 +121,7 @@ pub async fn fetch_products(
             RecipeAvailability::Alko => "AND p.retailer = 'alko'",
             RecipeAvailability::Superalko => "AND p.retailer = 'superalko'",
             RecipeAvailability::VikingLine => "AND p.retailer = 'viking_line'",
+            RecipeAvailability::TallinkSilja => "AND p.retailer = 'tallink_silja'"
         })
         .unwrap_or("");
 
