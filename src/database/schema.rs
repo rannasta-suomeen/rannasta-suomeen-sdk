@@ -4,7 +4,7 @@ use super::error::TypeError;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{postgres::PgRow, FromRow, Row};
+use sqlx::{postgres::PgRow, types::Json, FromRow, Row};
 
 use chrono::serde::ts_seconds;
 
@@ -188,6 +188,7 @@ pub enum Retailer {
     Alko,
     Superalko,
     VikingLine,
+    TallinkSilja
 }
 
 #[derive(
@@ -483,6 +484,8 @@ pub struct Product {
 
     pub checksum: String,
     pub retailer: Retailer,
+
+    pub alternative_prices: Json<BTreeMap<String, f64>>,
 }
 
 impl<'r> FromRow<'r, PgRow> for Product {
@@ -505,6 +508,7 @@ impl<'r> FromRow<'r, PgRow> for Product {
             unit_price: row.try_get("unit_price")?,
             checksum: row.try_get("checksum")?,
             retailer: row.try_get("retailer")?,
+            alternative_prices: row.try_get("alternative_prices")?,
         })
     }
 }
@@ -527,6 +531,8 @@ pub struct ProductRow {
     #[serde(with = "ts_seconds")]
     pub last_available: DateTime<Utc>,
 
+    pub alternative_prices: Json<BTreeMap<String, f64>>,
+
     pub count: i64,
 }
 
@@ -547,6 +553,7 @@ impl<'r> FromRow<'r, PgRow> for ProductRow {
             aer: row.try_get("aer")?,
             unit_price: row.try_get("unit_price")?,
             retailer: row.try_get("retailer")?,
+            alternative_prices: row.try_get("alternative_prices")?,
             count: row.try_get("count")?,
         })
     }

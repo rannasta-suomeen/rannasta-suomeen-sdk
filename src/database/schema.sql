@@ -215,6 +215,8 @@ CREATE TABLE products (
     last_available TIMESTAMP NOT NULL DEFAULT NOW(),
     currently_available BOOLEAN NOT NULL DEFAULT false,
 
+    alternative_prices JSONB NOT NULL DEFAULT '{}',
+
     checksum TEXT UNIQUE NOT NULL,
 
     FOREIGN KEY (category_id) REFERENCES categories (id),
