@@ -488,10 +488,41 @@ pub struct Product {
     pub retailer: Retailer,
 
     pub alternative_prices: Json<BTreeMap<String, f64>>,
+    pub alternative_deals: Vec<Deal>,
+    pub best_deal: Option<Deal>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Deal {
+    pub provider: String,
+    pub price: f64
+}
+
+impl Product {
+
+    pub fn parse_product_alternatives(mapping: &Json<BTreeMap<String, f64>>) -> (Vec<Deal>, Option<Deal>) {
+        let mut res: Vec<Deal> = vec![];
+        let mut tmp: Option<f64> = None;
+        let mut best: Option<Deal> = None;
+        for (provider, price) in mapping.iter() {
+            let deal = Deal { provider: provider.to_owned(), price: *price };
+            res.push(deal.clone());
+
+            if *price < tmp.unwrap_or(f64::MAX) {
+                tmp = Some(*price);
+                best = Some(deal);
+            }
+        }
+
+        (res, best)
+    }
 }
 
 impl<'r> FromRow<'r, PgRow> for Product {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        let alternative_prices = row.try_get("alternative_prices")?;
+        let (alternative_deals, best_deal) = Product::parse_product_alternatives(&alternative_prices);
+
         Ok(Self {
             id: row.try_get("id")?,
             name: row.try_get("name")?,
@@ -510,7 +541,9 @@ impl<'r> FromRow<'r, PgRow> for Product {
             unit_price: row.try_get("unit_price")?,
             checksum: row.try_get("checksum")?,
             retailer: row.try_get("retailer")?,
-            alternative_prices: row.try_get("alternative_prices")?,
+            alternative_prices,
+            alternative_deals,
+            best_deal,
         })
     }
 }
@@ -534,12 +567,17 @@ pub struct ProductRow {
     pub last_available: DateTime<Utc>,
 
     pub alternative_prices: Json<BTreeMap<String, f64>>,
+    pub alternative_deals: Vec<Deal>,
+    pub best_deal: Option<Deal>,
 
     pub count: i64,
 }
 
 impl<'r> FromRow<'r, PgRow> for ProductRow {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        let alternative_prices = row.try_get("alternative_prices")?;
+        let (alternative_deals, best_deal) = Product::parse_product_alternatives(&alternative_prices);
+
         Ok(Self {
             id: row.try_get("id")?,
             name: row.try_get("name")?,
@@ -555,7 +593,9 @@ impl<'r> FromRow<'r, PgRow> for ProductRow {
             aer: row.try_get("aer")?,
             unit_price: row.try_get("unit_price")?,
             retailer: row.try_get("retailer")?,
-            alternative_prices: row.try_get("alternative_prices")?,
+            alternative_prices,
+            alternative_deals,
+            best_deal,
             count: row.try_get("count")?,
         })
     }
@@ -1031,7 +1071,7 @@ pub struct ProductPriceHistoryEntry {
     pub price: f64,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductBestDealEntry {
     pub name: String,
     pub category: String,
@@ -1043,4 +1083,31 @@ pub struct ProductBestDealEntry {
     pub abv: f64,
     pub aer: f64,
     pub volume: f64,
+
+    pub alternative_prices: Json<BTreeMap<String, f64>>,
+    pub alternative_deals: Vec<Deal>,
+    pub best_deal: Option<Deal>,
+}
+
+impl<'r> FromRow<'r, PgRow> for ProductBestDealEntry {
+    fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
+        let alternative_prices = row.try_get("alternative_prices")?;
+        let (alternative_deals, best_deal) = Product::parse_product_alternatives(&alternative_prices);
+
+        Ok(Self {
+            name: row.try_get("name")?,
+            category: row.try_get("category")?,
+            retailer: row.try_get("retailer")?,
+            id: row.try_get("id")?,
+            href: row.try_get("href")?,
+            price: row.try_get("price")?,
+            unit_price: row.try_get("unit_price")?,
+            abv: row.try_get("abv")?,
+            aer: row.try_get("aer")?,
+            volume: row.try_get("volume")?,
+            alternative_prices,
+            alternative_deals,
+            best_deal,
+        })
+    }
 }

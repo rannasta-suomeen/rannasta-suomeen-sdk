@@ -95,7 +95,8 @@ pub async fn list_best_deals(
         p.unit_price,
         p.abv,
         p.aer,
-        P.volume
+        P.volume,
+        p.alternative_prices
         FROM map m
         JOIN products p ON m.id = p.id
         JOIN categories c ON m.category_id = c.id;
