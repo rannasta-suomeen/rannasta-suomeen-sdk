@@ -72,6 +72,7 @@ pub async fn fetch_recipes(
             RecipeAvailability::Superalko => "AND r.available_superalko",
             // TODO see #39
             RecipeAvailability::VikingLine => "",
+            RecipeAvailability::TallinkSilja => ""
         })
         .unwrap_or("");
 
